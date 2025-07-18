@@ -128,7 +128,6 @@ export default function NewInvoiceScreen() {
       return;
     }
 
-    console.log('Saving new invoice with data:', formData);
     setLoading(true);
     
     try {
@@ -154,12 +153,10 @@ export default function NewInvoiceScreen() {
           total,
           user_id: user.id,
         }])
-        .select('*')
+        .select()
         .single();
       
       if (invoiceError) throw invoiceError;
-
-      console.log('Invoice created successfully:', invoice);
 
       // Add invoice items
       const invoiceItems = items.map(item => ({
@@ -190,10 +187,7 @@ export default function NewInvoiceScreen() {
       router.back();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      Alert.alert(
-        'Error', 
-        `Failed to create invoice: ${error instanceof Error ? error.message : 'Please try again.'}`
-      );
+      Alert.alert('Error', 'Failed to create invoice. Please try again.');
     } finally {
       setLoading(false);
     }

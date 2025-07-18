@@ -153,11 +153,6 @@ export default function AIEmailComposerScreen() {
       return;
     }
 
-    console.log('Sending AI-composed email:', { 
-      to: formData.to, 
-      subject: formData.subject,
-      purpose: formData.purpose 
-    });
     setLoading(true);
     
     try {
@@ -169,24 +164,20 @@ export default function AIEmailComposerScreen() {
           type: 'email_sent',
           title: `AI-generated email sent: ${formData.subject}`,
           description: `To: ${formData.to}`,
-          user_id: user.id,
+          user_id: user?.id,
         }]);
 
-      Alert.alert('Success', 'Email sent successfully!');
+      Alert.alert('Success', 'Email sent successfully! (In production, this would integrate with an email service)');
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);
-      Alert.alert(
-        'Error', 
-        `Failed to send email: ${error instanceof Error ? error.message : 'Please try again.'}`
-      );
+      Alert.alert('Error', 'Failed to send email. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSaveDraft = async () => {
-    console.log('Saving AI-composed email draft');
     try {
       await supabase
         .from('activities')
@@ -194,16 +185,13 @@ export default function AIEmailComposerScreen() {
           type: 'email_draft_saved',
           title: `Email draft saved: ${formData.subject || 'Untitled'}`,
           description: `To: ${formData.to}`,
-          user_id: user.id,
+          user_id: user?.id,
         }]);
 
       Alert.alert('Success', 'Draft saved successfully!');
     } catch (error) {
       console.error('Error saving draft:', error);
-      Alert.alert(
-        'Error', 
-        `Failed to save draft: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      Alert.alert('Error', 'Failed to save draft.');
     }
   };
 

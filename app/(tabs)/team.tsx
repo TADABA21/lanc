@@ -82,62 +82,38 @@ export default function TeamScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (!user) {
-              Alert.alert('Error', 'User not authenticated');
-              return;
-            }
-
             try {
-              console.log('Starting team member deletion process for:', employeeId);
-              
-              // Step 1: Delete project memberships
-              console.log('Deleting project memberships...');
+              // Delete related project memberships first
               await supabase
                 .from('project_members')
                 .delete()
                 .eq('team_member_id', employeeId);
 
-              // Step 2: Update project files to remove references
-              console.log('Updating project files references...');
-              await supabase
-                .from('project_files')
-                .update({ uploaded_by: null })
-                .eq('uploaded_by', employeeId);
-
-              // Step 3: Delete the team member
-              console.log('Deleting team member...');
+              // Delete the team member
               const { error } = await supabase
                 .from('team_members')
                 .delete()
                 .eq('id', employeeId)
-                .eq('user_id', user.id);
+                .eq('user_id', user?.id);
 
-              if (error) {
-                console.error('Error deleting team member:', error);
-                throw error;
-              }
+              if (error) throw error;
 
-              // Step 4: Create activity log
+              // Create activity log
               await supabase
                 .from('activities')
                 .insert([{
                   type: 'team_member_deleted',
                   title: `Team member deleted: ${employeeName}`,
-                  description: 'Team member and all related data permanently deleted',
+                  description: 'Team member was permanently deleted',
                   entity_type: 'team_member',
-                  user_id: user.id,
+                  user_id: user?.id,
                 }]);
 
-              console.log('Team member deletion completed successfully');
               await fetchEmployees();
               Alert.alert('Success', 'Team member deleted successfully');
-              
             } catch (error) {
-              console.error('Error in team member deletion process:', error);
-              Alert.alert(
-                'Error', 
-                `Failed to delete team member: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
-              );
+              console.error('Error deleting team member:', error);
+              Alert.alert('Error', 'Failed to delete team member');
             }
           },
         },
@@ -196,14 +172,12 @@ export default function TeamScreen() {
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => handleEditTeamMember(employee.id)}
-            activeOpacity={0.7}
           >
             <Edit size={16} color={colors.warning} />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.deleteButton}
+            style={styles.actionButton}
             onPress={() => handleDeleteTeamMember(employee.id, employee.name)}
-            activeOpacity={0.7}
           >
             <Trash2 size={16} color={colors.error} />
           </TouchableOpacity>
@@ -428,21 +402,6 @@ export default function TeamScreen() {
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    deleteButton: {
-      padding: 8,
-      borderRadius: 6,
-      backgroundColor: `${colors.error}15`,
-      borderColor: colors.error,
-      borderWidth: 1,
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     employeeDetails: {
       flexDirection: 'row',

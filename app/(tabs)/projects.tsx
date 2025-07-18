@@ -85,103 +85,45 @@ export default function ProjectsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (!user) {
-              Alert.alert('Error', 'User not authenticated');
-              return;
-            }
-
             try {
-              console.log('Starting project deletion process for:', projectId);
-              
-              // Step 1: Delete project members
-              console.log('Deleting project members...');
+              // Delete related project members first
               await supabase
                 .from('project_members')
                 .delete()
                 .eq('project_id', projectId);
 
-              // Step 2: Delete project files
-              console.log('Deleting project files...');
-              await supabase
-                .from('project_files')
-                .delete()
-                .eq('project_id', projectId);
-
-              // Step 3: Delete invoice items for project invoices
-              console.log('Deleting invoice items...');
-              const { data: projectInvoices } = await supabase
-                .from('invoices')
-                .select('id')
-                .eq('project_id', projectId)
-                .eq('user_id', user.id);
-
-              if (projectInvoices && projectInvoices.length > 0) {
-                for (const invoice of projectInvoices) {
-                  await supabase
-                    .from('invoice_items')
-                    .delete()
-                    .eq('invoice_id', invoice.id);
-                }
-              }
-
-              // Step 4: Delete project invoices
-              console.log('Deleting project invoices...');
+              // Delete related invoices
               await supabase
                 .from('invoices')
                 .delete()
                 .eq('project_id', projectId)
-                .eq('user_id', user.id);
+                .eq('user_id', user?.id);
 
-              // Step 5: Delete project testimonials
-              console.log('Deleting project testimonials...');
-              await supabase
-                .from('testimonials')
-                .delete()
-                .eq('project_id', projectId)
-                .eq('user_id', user.id);
-
-              // Step 6: Delete project contracts
-              console.log('Deleting project contracts...');
-              await supabase
-                .from('contracts')
-                .delete()
-                .eq('project_id', projectId)
-                .eq('user_id', user.id);
-
-              // Step 7: Finally delete the project
-              console.log('Deleting project...');
+              // Delete the project
               const { error } = await supabase
                 .from('projects')
                 .delete()
                 .eq('id', projectId)
-                .eq('user_id', user.id);
+                .eq('user_id', user?.id);
 
-              if (error) {
-                console.error('Error deleting project:', error);
-                throw error;
-              }
+              if (error) throw error;
 
-              // Step 8: Create activity log
+              // Create activity log
               await supabase
                 .from('activities')
                 .insert([{
                   type: 'project_deleted',
                   title: `Project deleted: ${projectName}`,
-                  description: 'Project and all related data permanently deleted',
+                  description: 'Project was permanently deleted',
                   entity_type: 'project',
-                  user_id: user.id,
+                  user_id: user?.id,
                 }]);
 
-              console.log('Project deletion completed successfully');
               await fetchProjects();
               Alert.alert('Success', 'Project deleted successfully');
-              
             } catch (error) {
-              console.error('Error in project deletion process:', error);
-              Alert.alert(
-                'Error', 
-                `Failed to delete project: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
-              );
+              console.error('Error deleting project:', error);
+              Alert.alert('Error', 'Failed to delete project');
             }
           },
         },
@@ -240,21 +182,18 @@ export default function ProjectsScreen() {
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => handleViewProject(project.id)}
-              activeOpacity={0.7}
             >
               <Eye size={16} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => handleEditProject(project.id)}
-              activeOpacity={0.7}
             >
               <Edit size={16} color={colors.warning} />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.deleteButton}
+              style={styles.actionButton}
               onPress={() => handleDeleteProject(project.id, project.name)}
-              activeOpacity={0.7}
             >
               <Trash2 size={16} color={colors.error} />
             </TouchableOpacity>
@@ -422,21 +361,6 @@ export default function ProjectsScreen() {
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    deleteButton: {
-      padding: 8,
-      borderRadius: 6,
-      backgroundColor: `${colors.error}15`,
-      borderColor: colors.error,
-      borderWidth: 1,
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     projectDetails: {
       flexDirection: 'row',
@@ -525,7 +449,7 @@ export default function ProjectsScreen() {
       {shouldShowSidebar && (
         <View style={styles.header}>
           <Text style={styles.title}>Projects</Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddProject} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddProject}>
             <Plus size={20} color="white" />
           </TouchableOpacity>
         </View>
