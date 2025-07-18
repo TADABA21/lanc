@@ -14,6 +14,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Save, X, User, Mail, Phone, Briefcase, DollarSign, Calendar, ChevronDown } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 
 export default function EditTeamMemberScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,7 +29,7 @@ export default function EditTeamMemberScreen() {
     role: '',
     department: '',
     salary: '',
-    hire_date: new Date().toISOString().split('T')[0],
+    hire_date: new Date(),
     emergency_contact: '',
     status: 'active' as 'active' | 'on_leave' | 'terminated',
   });
@@ -83,7 +84,7 @@ export default function EditTeamMemberScreen() {
         role: data.role,
         department: data.department || '',
         salary: data.salary?.toString() || '',
-        hire_date: data.hire_date || new Date().toISOString().split('T')[0],
+        hire_date: data.hire_date ? new Date(data.hire_date) : new Date(),
         emergency_contact: data.emergency_contact || '',
         status: data.status,
       });
@@ -114,7 +115,7 @@ export default function EditTeamMemberScreen() {
           role: formData.role.trim(),
           department: formData.department.trim() || null,
           salary: formData.salary ? parseFloat(formData.salary) : 0,
-          hire_date: formData.hire_date || null,
+          hire_date: formData.hire_date ? formData.hire_date.toISOString().split('T')[0] : null,
           emergency_contact: formData.emergency_contact.trim() || null,
           status: formData.status,
         })
@@ -504,16 +505,11 @@ export default function EditTeamMemberScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hire Date</Text>
-            <View style={styles.inputWithIcon}>
-              <Calendar size={20} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputText}
-                value={formData.hire_date}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, hire_date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <DatePicker
+              value={formData.hire_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, hire_date: date }))}
+              placeholder="Select hire date"
+            />
           </View>
 
           <View style={styles.inputGroup}>

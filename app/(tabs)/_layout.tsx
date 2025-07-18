@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Chrome as Home, FolderOpen, Users, User, Menu } from 'lucide-react-native';
+import { Chrome as Home, FolderOpen, Users, User, Menu, Award } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSidebar } from '@/contexts/SidebarContext';
@@ -256,7 +256,32 @@ export default function TabLayout() {
       <Tabs.Screen
         name="testimonials"
         options={{
-          href: null, // This hides the tab from the tab bar
+          title: 'Testimonials',
+          tabBarIcon: ({ size, color }) => (
+            <Award size={size} color={color} />
+          ),
+          headerShown: isMobile,
+          headerTitle: 'Testimonials',
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTitleStyle: {
+            color: colors.text,
+            fontFamily: 'Inter-Bold',
+          },
+          headerLeft: isMobile ? () => (
+            <TouchableOpacity
+              onPress={openSidebar}
+              style={{
+                marginLeft: 16,
+                padding: 8,
+                borderRadius: 8,
+                backgroundColor: colors.background,
+              }}
+            >
+              <Menu size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : undefined,
         }}
       />
     </Tabs>

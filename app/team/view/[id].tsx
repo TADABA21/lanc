@@ -474,17 +474,11 @@ export default function TeamMemberDetailScreen() {
     }
 
     try {
-      const emailUrl = `mailto:${employee.email}?subject=Hello from ${user?.email}`;
-      const canOpen = await Linking.canOpenURL(emailUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(emailUrl);
-      } else {
-        router.push(`/email?to=${employee.email}&employeeName=${employee.name}`);
-      }
+      // Always use AI email composer
+      router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
     } catch (error) {
       console.error('Error opening email:', error);
-      router.push(`/email?to=${employee.email}&employeeName=${employee.name}`);
+      router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
     }
   };
 
@@ -514,7 +508,7 @@ export default function TeamMemberDetailScreen() {
   };
 
   const handleSendMessage = () => {
-    router.push(`/messages/new?employeeId=${id}`);
+    router.push(`/email/ai-compose?to=${employee?.email}&employeeName=${employee?.name}`);
   };
 
   if (loading) {

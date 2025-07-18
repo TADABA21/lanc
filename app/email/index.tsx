@@ -18,6 +18,11 @@ import { Client } from '@/types/database';
 import { ArrowLeft, Send, Paperclip, Save, Users, ChevronDown } from 'lucide-react-native';
 
 export default function EmailComposerScreen() {
+  // Redirect to AI composer by default
+  React.useEffect(() => {
+    router.replace('/email/ai-compose');
+  }, []);
+
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();

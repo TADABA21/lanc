@@ -49,7 +49,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'clients', title: 'Clients', icon: Users, route: '/(tabs)/clients' },
   { id: 'team', title: 'Team', icon: User, route: '/(tabs)/team' },
   { id: 'testimonials', title: 'Testimonials', icon: Award, route: '/(tabs)/testimonials', showOnMobile: true },
-  { id: 'email', title: 'Email Composer', icon: Mail, route: '/email', showOnMobile: true },
+  { id: 'email', title: 'Email Composer', icon: Mail, route: '/email/ai-compose', showOnMobile: true },
 ];
 
 export function Sidebar() {

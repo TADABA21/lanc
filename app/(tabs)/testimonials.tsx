@@ -62,8 +62,8 @@ export default function TestimonialsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out our client testimonials!',
-        url: 'https://example.com/testimonials', // Replace with your actual testimonials page
+        message: `Check out our client testimonials! We have ${testimonials.length} reviews with an average rating of ${averageRating.toFixed(1)} stars.`,
+        url: `https://testimonials.example.com/${user?.id}`, // Replace with your actual testimonials page
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -400,7 +400,7 @@ export default function TestimonialsScreen() {
               Share this link with clients to collect testimonials
             </Text>
             <Text style={styles.linkUrl}>
-              https://example.com/testimonials/{user?.id}
+              https://testimonials.example.com/{user?.id}
             </Text>
           </View>
           <TouchableOpacity style={styles.linkButton}>

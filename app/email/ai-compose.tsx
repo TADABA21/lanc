@@ -138,7 +138,7 @@ export default function AIEmailComposerScreen() {
         body: body.trim() || aiResponse,
       }));
       
-      Alert.alert('Success', 'AI has generated a professional email!');
+      Alert.alert('Success', 'AI has generated a professional email! Review and edit as needed before sending.');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate email with AI. Please try again.');
@@ -156,7 +156,8 @@ export default function AIEmailComposerScreen() {
     setLoading(true);
     
     try {
-      // In a real app, you would integrate with an email service
+      // In a real app, you would integrate with an email service like SendGrid or AWS SES
+      // For now, we'll simulate sending and log the activity
       await supabase
         .from('activities')
         .insert([{
@@ -166,7 +167,7 @@ export default function AIEmailComposerScreen() {
           user_id: user?.id,
         }]);
 
-      Alert.alert('Success', 'Email sent successfully!');
+      Alert.alert('Success', 'Email sent successfully! (In production, this would integrate with an email service)');
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);

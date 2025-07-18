@@ -31,6 +31,7 @@ import {
   Download,
   Send
 } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 
 interface InvoiceItem {
   description: string;
@@ -49,8 +50,8 @@ export default function AIInvoiceGeneratorScreen() {
     invoice_number: `INV-${Date.now()}`,
     client_id: '',
     project_id: projectId || '',
-    issue_date: new Date().toISOString().split('T')[0],
-    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    issue_date: new Date(),
+    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     notes: '',
     terms: '',
   });
@@ -219,7 +220,7 @@ export default function AIInvoiceGeneratorScreen() {
         terms: terms || 'Payment is due within 30 days of invoice date. Late payments may incur additional fees. Please remit payment to the address listed above.',
       }));
       
-      Alert.alert('Success', 'AI has generated professional invoice content!');
+      Alert.alert('Success', 'AI has generated professional invoice content! Review and edit as needed before saving.');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate content with AI. Please try again.');
@@ -247,8 +248,8 @@ export default function AIInvoiceGeneratorScreen() {
           invoice_number: formData.invoice_number,
           client_id: formData.client_id,
           project_id: formData.project_id || null,
-          issue_date: formData.issue_date,
-          due_date: formData.due_date,
+          issue_date: formData.issue_date.toISOString().split('T')[0],
+          due_date: formData.due_date.toISOString().split('T')[0],
           status: 'draft',
           amount: total,
           line_items: items,
@@ -808,30 +809,20 @@ export default function AIInvoiceGeneratorScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Issue Date</Text>
-            <View style={styles.inputWithIcon}>
-              <Calendar size={20} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputText}
-                value={formData.issue_date}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, issue_date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <DatePicker
+              value={formData.issue_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, issue_date: date }))}
+              placeholder="Select issue date"
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Due Date</Text>
-            <View style={styles.inputWithIcon}>
-              <Calendar size={20} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputText}
-                value={formData.due_date}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, due_date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <DatePicker
+              value={formData.due_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, due_date: date }))}
+              placeholder="Select due date"
+            />
           </View>
         </View>
 

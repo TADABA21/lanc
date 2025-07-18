@@ -1,4 +1,4 @@
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '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';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export interface GroqMessage {

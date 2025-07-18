@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-export default function TeamLayout() {
+export default function ProjectsLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="new" />
