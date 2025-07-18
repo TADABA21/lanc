@@ -73,6 +73,7 @@ export default function EditClientScreen() {
       return;
     }
 
+    console.log('Updating client with data:', formData);
     setLoading(true);
     
     try {
@@ -90,6 +91,8 @@ export default function EditClientScreen() {
       
       if (error) throw error;
 
+      console.log('Client updated successfully');
+
       // Create activity log
       await supabase
         .from('activities')
@@ -106,7 +109,10 @@ export default function EditClientScreen() {
       router.back();
     } catch (error) {
       console.error('Error updating client:', error);
-      Alert.alert('Error', 'Failed to update client. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to update client: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }

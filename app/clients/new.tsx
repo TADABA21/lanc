@@ -36,10 +36,11 @@ export default function NewClientScreen() {
       return;
     }
 
+    console.log('Saving new client with data:', formData);
     setLoading(true);
     
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('clients')
         .insert([{
           name: formData.name.trim(),
@@ -48,9 +49,13 @@ export default function NewClientScreen() {
           company: formData.company.trim(),
           address: formData.address.trim() || null,
           user_id: user.id,
-        }]);
+        }])
+        .select('*')
+        .single();
       
       if (error) throw error;
+
+      console.log('Client created successfully:', data);
 
       // Create activity log
       await supabase
@@ -60,6 +65,7 @@ export default function NewClientScreen() {
           title: `New client added: ${formData.name}`,
           description: `Company: ${formData.company}`,
           entity_type: 'client',
+          entity_id: data.id,
           user_id: user.id,
         }]);
 
@@ -67,7 +73,10 @@ export default function NewClientScreen() {
       router.back();
     } catch (error) {
       console.error('Error adding client:', error);
-      Alert.alert('Error', 'Failed to add client. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to add client: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }

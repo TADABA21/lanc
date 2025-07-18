@@ -142,6 +142,8 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       return;
     }
 
+    console.log('Adding new client:', newClientData);
+
     try {
       const { data, error } = await supabase
         .from('clients')
@@ -153,10 +155,12 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
           address: newClientData.address.trim() || null,
           user_id: user.id,
         }])
-        .select()
+        .select('*')
         .single();
       
       if (error) throw error;
+
+      console.log('Client added successfully:', data);
 
       // Add to clients list and select it
       setClients(prev => [data, ...prev]);
@@ -175,7 +179,10 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       Alert.alert('Success', 'Client added successfully!');
     } catch (error) {
       console.error('Error adding client:', error);
-      Alert.alert('Error', 'Failed to add client. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to add client: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     }
   };
 
@@ -185,6 +192,7 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       return;
     }
 
+    console.log('Saving project with data:', formData);
     setLoading(true);
     
     try {
@@ -204,6 +212,7 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
 
       if (projectId) {
         // Update existing project
+        console.log('Updating existing project:', projectId);
         const { error } = await supabase
           .from('projects')
           .update(projectData)
@@ -234,14 +243,17 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         }
       } else {
         // Create new project
+        console.log('Creating new project');
         const { data, error } = await supabase
           .from('projects')
           .insert([projectData])
-          .select()
+          .select('*')
           .single();
         
         if (error) throw error;
         projectId_ = data.id;
+        
+        console.log('Project created successfully:', data);
         
         // Add team members to project
         if (selectedTeamMembers.length > 0) {
@@ -278,7 +290,10 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       }
     } catch (error) {
       console.error('Error saving project:', error);
-      Alert.alert('Error', 'Failed to save project. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to save project: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }

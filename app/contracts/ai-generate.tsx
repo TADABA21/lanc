@@ -206,6 +206,7 @@ export default function AIContractGeneratorScreen() {
       return;
     }
 
+    console.log('Saving AI-generated contract with data:', formData);
     setLoading(true);
     
     try {
@@ -220,10 +221,12 @@ export default function AIContractGeneratorScreen() {
           status: 'draft',
           user_id: user.id,
         }])
-        .select()
+        .select('*')
         .single();
       
       if (contractError) throw contractError;
+
+      console.log('Contract created successfully:', contract);
 
       await supabase
         .from('activities')
@@ -240,7 +243,10 @@ export default function AIContractGeneratorScreen() {
       router.back();
     } catch (error) {
       console.error('Error creating contract:', error);
-      Alert.alert('Error', 'Failed to create contract. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to create contract: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }

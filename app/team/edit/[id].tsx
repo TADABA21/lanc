@@ -103,6 +103,7 @@ export default function EditTeamMemberScreen() {
       return;
     }
 
+    console.log('Updating team member with data:', formData);
     setLoading(true);
     
     try {
@@ -124,6 +125,8 @@ export default function EditTeamMemberScreen() {
       
       if (error) throw error;
 
+      console.log('Team member updated successfully');
+
       // Create activity log
       await supabase
         .from('activities')
@@ -140,7 +143,10 @@ export default function EditTeamMemberScreen() {
       router.back();
     } catch (error) {
       console.error('Error updating team member:', error);
-      Alert.alert('Error', 'Failed to update team member. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to update team member: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }

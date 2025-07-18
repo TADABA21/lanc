@@ -54,10 +54,17 @@ export default function NewTeamMemberScreen() {
       return;
     }
 
+    console.log('Saving new team member with data:', {
+      name: formData.name,
+      role: formData.role,
+      department: formData.department,
+      salary: formData.salary
+    });
+    
     setLoading(true);
     
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('team_members')
         .insert([{
           name: formData.name.trim(),
@@ -71,8 +78,15 @@ export default function NewTeamMemberScreen() {
           status: 'active',
           user_id: user.id,
         }]);
+        .select('*')
+        .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating team member:', error);
+        throw error;
+      }
+
+      console.log('Team member created successfully:', data);
 
       // Create activity log
       await supabase
@@ -82,6 +96,7 @@ export default function NewTeamMemberScreen() {
           title: `New team member added: ${formData.name}`,
           description: `Role: ${formData.role}`,
           entity_type: 'team_member',
+          entity_id: data.id,
           user_id: user.id,
         }]);
 
@@ -89,7 +104,10 @@ export default function NewTeamMemberScreen() {
       router.back();
     } catch (error) {
       console.error('Error adding team member:', error);
-      Alert.alert('Error', 'Failed to add team member. Please try again.');
+      Alert.alert(
+        'Error', 
+        `Failed to add team member: ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setLoading(false);
     }
