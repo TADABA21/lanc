@@ -83,6 +83,13 @@ export default function TeamScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Delete related project memberships first
+              await supabase
+                .from('project_members')
+                .delete()
+                .eq('team_member_id', employeeId);
+
+              // Delete the team member
               const { error } = await supabase
                 .from('team_members')
                 .delete()

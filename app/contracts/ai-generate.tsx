@@ -191,7 +191,7 @@ export default function AIContractGeneratorScreen() {
         title: prev.title || `${formData.type} - ${selectedClient.name}`,
       }));
       
-      Alert.alert('Success', 'AI has generated a comprehensive, professional contract with all necessary clauses and terms!');
+      Alert.alert('Success', 'AI has generated a professional contract! Review and edit as needed before saving.');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate contract with AI. Please try again.');

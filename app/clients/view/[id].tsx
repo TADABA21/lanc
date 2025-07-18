@@ -391,18 +391,11 @@ export default function ClientDetailScreen() {
     }
 
     try {
-      const emailUrl = `mailto:${client.email}?subject=Hello from ${user?.email}`;
-      const canOpen = await Linking.canOpenURL(emailUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(emailUrl);
-      } else {
-        // Fallback to navigation to email composer
-        router.push(`/email?to=${client.email}&clientName=${client.name}`);
-      }
+      // Always use AI email composer
+      router.push(`/email/ai-compose?to=${client.email}&clientName=${client.name}`);
     } catch (error) {
       console.error('Error opening email:', error);
-      router.push(`/email?to=${client.email}&clientName=${client.name}`);
+      router.push(`/email/ai-compose?to=${client.email}&clientName=${client.name}`);
     }
   };
 

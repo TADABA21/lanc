@@ -86,6 +86,20 @@ export default function ProjectsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Delete related project members first
+              await supabase
+                .from('project_members')
+                .delete()
+                .eq('project_id', projectId);
+
+              // Delete related invoices
+              await supabase
+                .from('invoices')
+                .delete()
+                .eq('project_id', projectId)
+                .eq('user_id', user?.id);
+
+              // Delete the project
               const { error } = await supabase
                 .from('projects')
                 .delete()

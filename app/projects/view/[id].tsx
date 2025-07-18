@@ -43,6 +43,7 @@ import { formatCurrency, getStatusColor, formatDistanceToNow } from '@/lib/utils
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusDropdown } from '@/components/StatusDropdown';
 import { TimerWidget } from '@/components/TimerWidget';
+import { DocumentPickerComponent } from '@/components/DocumentPicker';
 
 type ProjectWithRelations = Project & {
   client?: Client;
@@ -693,11 +694,11 @@ export default function ProjectDetailScreen() {
   };
 
   const handleCreateInvoice = () => {
-    router.push(`/invoices/new?projectId=${id}`);
+    router.push(`/invoices/ai-generate?projectId=${id}`);
   };
 
   const handleCreateContract = () => {
-    router.push(`/contracts/new?projectId=${id}`);
+    router.push(`/contracts/ai-generate?projectId=${id}`);
   };
 
   const handleAddTask = () => {
@@ -749,9 +750,29 @@ export default function ProjectDetailScreen() {
   };
 
   const handleFileUpload = () => {
-    // In a real app, this would open a file picker
-    Alert.alert('File Upload', 'File upload functionality would be implemented here with expo-document-picker');
+    // File upload is now handled by DocumentPickerComponent
     setShowUploadModal(false);
+  };
+
+  const handleFilesSelected = async (files: any[]) => {
+    try {
+      // In a real app, you would upload files to cloud storage
+      // For now, we'll just add them to the local state
+      const newFiles = files.map(file => ({
+        id: Date.now().toString() + Math.random(),
+        name: file.name,
+        size: file.size,
+        type: file.mimeType,
+        url: file.uri,
+        uploaded_at: new Date().toISOString(),
+      }));
+      
+      setFiles(prev => [...prev, ...newFiles]);
+      Alert.alert('Success', `${files.length} file(s) uploaded successfully!`);
+    } catch (error) {
+      console.error('Error handling files:', error);
+      Alert.alert('Error', 'Failed to upload files');
+    }
   };
 
   if (loading) {
@@ -1276,8 +1297,15 @@ export default function ProjectDetailScreen() {
             </View>
             
             <Text style={[styles.description, { color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }]}>
-              File upload functionality would be implemented here using expo-document-picker for selecting files and a cloud storage service for hosting.
+              Select files to upload to this project. Supported formats include documents, images, and other file types.
             </Text>
+
+            <DocumentPickerComponent
+              onFilesSelected={handleFilesSelected}
+              maxFiles={10}
+              label=""
+              placeholder="Select files to upload"
+            />
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -1290,10 +1318,10 @@ export default function ProjectDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={handleFileUpload}
+                onPress={() => setShowUploadModal(false)}
               >
                 <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                  Choose Files
+                  Done
                 </Text>
               </TouchableOpacity>
             </View>

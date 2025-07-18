@@ -107,6 +107,14 @@ export default function ClientsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // First delete related projects
+              await supabase
+                .from('projects')
+                .delete()
+                .eq('client_id', clientId)
+                .eq('user_id', user?.id);
+
+              // Then delete the client
               const { error } = await supabase
                 .from('clients')
                 .delete()

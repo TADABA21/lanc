@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Client, TeamMember } from '@/types/database';
 import { ArrowLeft, Calendar, DollarSign, Users, Save, X, ChevronDown, User, Plus, Check } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 
 interface ProjectFormProps {
   projectId?: string;
@@ -34,8 +35,8 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
     description: '',
     budget: '',
     client_id: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    start_date: new Date(),
+    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     status: 'todo' as 'todo' | 'in_progress' | 'completed',
     progress: 0,
   });
@@ -121,8 +122,8 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         description: data.description || '',
         budget: data.budget?.toString() || '',
         client_id: data.client_id || '',
-        start_date: data.start_date || '',
-        end_date: data.end_date || '',
+        start_date: data.start_date ? new Date(data.start_date) : new Date(),
+        end_date: data.end_date ? new Date(data.end_date) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         status: data.status,
         progress: data.progress || 0,
       });
@@ -192,8 +193,8 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         description: formData.description.trim(),
         budget: formData.budget ? parseFloat(formData.budget) : 0,
         client_id: formData.client_id || null,
-        start_date: formData.start_date || null,
-        end_date: formData.end_date || null,
+        start_date: formData.start_date ? formData.start_date.toISOString().split('T')[0] : null,
+        end_date: formData.end_date ? formData.end_date.toISOString().split('T')[0] : null,
         status: formData.status,
         progress: formData.progress,
         user_id: user.id,
@@ -800,30 +801,20 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Start Date</Text>
-            <View style={styles.inputWithIcon}>
-              <Calendar size={20} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputText}
-                value={formData.start_date}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, start_date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <DatePicker
+              value={formData.start_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, start_date: date }))}
+              placeholder="Select start date"
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>End Date</Text>
-            <View style={styles.inputWithIcon}>
-              <Calendar size={20} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputText}
-                value={formData.end_date}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, end_date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            <DatePicker
+              value={formData.end_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, end_date: date }))}
+              placeholder="Select end date"
+            />
           </View>
         </View>
 
