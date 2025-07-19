@@ -101,14 +101,14 @@ export function DocumentPickerComponent({
         return new Promise((resolve) => {
           input.onchange = (event: any) => {
             const files = Array.from(event.target.files || []) as File[];
-            const selectedFiles = files.map(file => ({
+            const newSelectedFiles = files.map(file => ({
               uri: URL.createObjectURL(file),
               name: file.name,
               size: file.size,
               mimeType: file.type,
             }));
             
-            const newFiles = [...this.selectedFiles, ...selectedFiles].slice(0, maxFiles);
+            const newFiles = [...selectedFiles, ...newSelectedFiles].slice(0, maxFiles);
             setSelectedFiles(newFiles);
             onFilesSelected(newFiles);
             saveFilesToStorage(newFiles);

@@ -413,11 +413,11 @@ export default function AIInvoiceGeneratorScreen() {
     },
     clientDropdownGroup: {
       marginBottom: 20,
-      zIndex: 3000,
+      zIndex: 1000,
     },
     projectDropdownGroup: {
       marginBottom: 20,
-      zIndex: 2000,
+      zIndex: 999,
     },
     label: {
       fontSize: 14,
@@ -492,8 +492,8 @@ export default function AIInvoiceGeneratorScreen() {
       borderRadius: 12,
       marginTop: 4,
       maxHeight: 200,
-      zIndex: 10000,
-      elevation: 10000,
+      zIndex: 2000,
+      elevation: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,

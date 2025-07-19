@@ -83,20 +83,30 @@ export default function TeamScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete related project memberships first
-              await supabase
+              // Remove from project memberships first
+              const { error: projectMembersError } = await supabase
                 .from('project_members')
                 .delete()
                 .eq('team_member_id', employeeId);
+              
+              if (projectMembersError) {
+                console.warn('Error removing project memberships:', projectMembersError);
+              }
+              
+              // Update project files to remove uploader reference
+              await supabase
+                .from('project_files')
+                .update({ uploaded_by: null })
+                .eq('uploaded_by', employeeId);
 
-              // Delete the team member
-              const { error } = await supabase
+              // Now delete the team member
+              const { error: teamMemberError } = await supabase
                 .from('team_members')
                 .delete()
                 .eq('id', employeeId)
                 .eq('user_id', user?.id);
 
-              if (error) throw error;
+              if (teamMemberError) throw teamMemberError;
 
               // Create activity log
               await supabase

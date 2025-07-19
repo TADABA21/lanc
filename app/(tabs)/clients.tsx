@@ -107,21 +107,47 @@ export default function ClientsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // First delete related projects
-              await supabase
-                .from('projects')
-                .delete()
-                .eq('client_id', clientId)
-                .eq('user_id', user?.id);
-
-              // Then delete the client
-              const { error } = await supabase
+              // Update related records to remove client reference instead of deleting
+              const updatePromises = [
+                // Update projects to remove client reference
+                supabase
+                  .from('projects')
+                  .update({ client_id: null })
+                  .eq('client_id', clientId)
+                  .eq('user_id', user?.id),
+                
+                // Update invoices to remove client reference
+                supabase
+                  .from('invoices')
+                  .update({ client_id: null })
+                  .eq('client_id', clientId)
+                  .eq('user_id', user?.id),
+                
+                // Update contracts to remove client reference
+                supabase
+                  .from('contracts')
+                  .update({ client_id: null })
+                  .eq('client_id', clientId)
+                  .eq('user_id', user?.id),
+                
+                // Update testimonials to remove client reference
+                supabase
+                  .from('testimonials')
+                  .update({ client_id: null })
+                  .eq('client_id', clientId)
+                  .eq('user_id', user?.id),
+              ];
+              
+              await Promise.all(updatePromises);
+              
+              // Now delete the client
+              const { error: clientError } = await supabase
                 .from('clients')
                 .delete()
                 .eq('id', clientId)
                 .eq('user_id', user?.id);
 
-              if (error) throw error;
+              if (clientError) throw clientError;
 
               // Create activity log
               await supabase

@@ -86,27 +86,52 @@ export default function ProjectsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete related project members first
-              await supabase
-                .from('project_members')
-                .delete()
-                .eq('project_id', projectId);
-
-              // Delete related invoices
-              await supabase
-                .from('invoices')
-                .delete()
-                .eq('project_id', projectId)
-                .eq('user_id', user?.id);
-
-              // Delete the project
-              const { error } = await supabase
+              // Delete related data first
+              const deletePromises = [
+                // Delete project members
+                supabase
+                  .from('project_members')
+                  .delete()
+                  .eq('project_id', projectId),
+                
+                // Delete project files
+                supabase
+                  .from('project_files')
+                  .delete()
+                  .eq('project_id', projectId),
+                
+                // Update invoices to remove project reference
+                supabase
+                  .from('invoices')
+                  .update({ project_id: null })
+                  .eq('project_id', projectId)
+                  .eq('user_id', user?.id),
+                
+                // Update contracts to remove project reference
+                supabase
+                  .from('contracts')
+                  .update({ project_id: null })
+                  .eq('project_id', projectId)
+                  .eq('user_id', user?.id),
+                
+                // Update testimonials to remove project reference
+                supabase
+                  .from('testimonials')
+                  .update({ project_id: null })
+                  .eq('project_id', projectId)
+                  .eq('user_id', user?.id),
+              ];
+              
+              await Promise.all(deletePromises);
+              
+              // Now delete the project
+              const { error: projectError } = await supabase
                 .from('projects')
                 .delete()
                 .eq('id', projectId)
                 .eq('user_id', user?.id);
 
-              if (error) throw error;
+              if (projectError) throw projectError;
 
               // Create activity log
               await supabase
