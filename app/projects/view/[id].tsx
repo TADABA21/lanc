@@ -1308,6 +1308,7 @@ export default function ProjectDetailScreen() {
               maxFiles={10}
               label=""
               placeholder="Select files to upload"
+              storageKey={`project_files_${id}`}
             />
 
             <View style={styles.modalActions}>

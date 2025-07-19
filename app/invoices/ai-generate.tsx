@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Sparkles,
 } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface InvoiceItem {
@@ -444,6 +445,15 @@ export default function AIInvoiceGeneratorScreen() {
     },
     inputGroup: {
       marginBottom: 20,
+      zIndex: 1,
+    },
+    clientDropdownGroup: {
+      marginBottom: 20,
+      zIndex: 3000,
+    },
+    projectDropdownGroup: {
+      marginBottom: 20,
+      zIndex: 2000,
     },
     label: {
       fontSize: 14,
@@ -486,7 +496,7 @@ export default function AIInvoiceGeneratorScreen() {
     },
     dropdownContainer: {
       position: 'relative',
-      zIndex: 100,
+      zIndex: 1000,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -518,8 +528,8 @@ export default function AIInvoiceGeneratorScreen() {
       borderRadius: 12,
       marginTop: 4,
       maxHeight: 200,
-      zIndex: 1000,
-      elevation: 1000,
+      zIndex: 10000,
+      elevation: 10000,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
@@ -778,7 +788,7 @@ export default function AIInvoiceGeneratorScreen() {
             </View>
           </View>
 
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.clientDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
@@ -818,7 +828,7 @@ export default function AIInvoiceGeneratorScreen() {
             )}
           </View>
 
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.projectDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>Project (Optional)</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
@@ -867,44 +877,20 @@ export default function AIInvoiceGeneratorScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Issue Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => showDatepicker('issue')}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.issue_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showIssueDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.issue_date}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, 'issue', date)}
-              />
-            )}
+            <DatePicker
+              value={formData.issue_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, issue_date: date }))}
+              placeholder="Select issue date"
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Due Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => showDatepicker('due')}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.due_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showDueDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.due_date}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, 'due', date)}
-              />
-            )}
+            <DatePicker
+              value={formData.due_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, due_date: date }))}
+              placeholder="Select due date"
+            />
           </View>
         </View>
 

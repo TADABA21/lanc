@@ -6,10 +6,11 @@ import {
   StyleSheet,
   Platform,
   Modal,
+  TextInput,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Calendar } from 'lucide-react-native';
+import { Calendar, X } from 'lucide-react-native';
 
 interface DatePickerProps {
   value: Date;
@@ -28,6 +29,8 @@ export function DatePicker({
 }: DatePickerProps) {
   const { colors } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(value);
+  const [dateInput, setDateInput] = useState(value.toISOString().split('T')[0]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -35,8 +38,30 @@ export function DatePicker({
     }
     
     if (selectedDate) {
-      onChange(selectedDate);
+      setTempDate(selectedDate);
+      if (Platform.OS === 'android') {
+        onChange(selectedDate);
+      }
     }
+  };
+
+  const handleWebDateChange = (dateString: string) => {
+    setDateInput(dateString);
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      setTempDate(date);
+    }
+  };
+
+  const handleConfirm = () => {
+    onChange(tempDate);
+    setShowPicker(false);
+  };
+
+  const handleCancel = () => {
+    setTempDate(value);
+    setDateInput(value.toISOString().split('T')[0]);
+    setShowPicker(false);
   };
 
   const formatDate = (date: Date) => {
@@ -94,12 +119,29 @@ export function DatePicker({
       padding: 20,
       width: '90%',
       maxWidth: 400,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
     },
     modalTitle: {
       fontSize: 18,
       fontFamily: 'Inter-Bold',
       color: colors.text,
       textAlign: 'center',
+      marginBottom: 20,
+    },
+    webDateInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
       marginBottom: 20,
     },
     modalActions: {
@@ -133,6 +175,14 @@ export function DatePicker({
     confirmButtonText: {
       color: 'white',
     },
+    closeButton: {
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+    },
   });
 
   return (
@@ -153,57 +203,60 @@ export function DatePicker({
         </Text>
       </TouchableOpacity>
 
-      {Platform.OS === 'ios' ? (
-        <Modal
-          visible={showPicker}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowPicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Select Date</Text>
-              
+      <Modal
+        visible={showPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
+              <X size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            
+            <Text style={styles.modalTitle}>Select Date</Text>
+            
+            {Platform.OS === 'web' ? (
+              <TextInput
+                style={styles.webDateInput}
+                value={dateInput}
+                onChangeText={handleWebDateChange}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textMuted}
+              />
+            ) : (
               <DateTimePicker
-                value={value || new Date()}
+                value={tempDate}
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
                 textColor={colors.text}
               />
+            )}
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancel}
+              >
+                <Text style={[styles.buttonText, styles.cancelButtonText]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
               
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setShowPicker(false)}
-                >
-                  <Text style={[styles.buttonText, styles.cancelButtonText]}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.confirmButton]}
-                  onPress={() => setShowPicker(false)}
-                >
-                  <Text style={[styles.buttonText, styles.confirmButtonText]}>
-                    Done
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleConfirm}
+              >
+                <Text style={[styles.buttonText, styles.confirmButtonText]}>
+                  Done
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-      ) : (
-        showPicker && (
-          <DateTimePicker
-            value={value || new Date()}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-          />
-        )
-      )}
+        </View>
+      </Modal>
     </View>
   );
 }

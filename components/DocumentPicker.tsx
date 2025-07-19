@@ -6,8 +6,10 @@ import {
   StyleSheet,
   Alert,
   FlatList,
+  Platform,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Upload, File, X, FileText, Image, Video, Music } from 'lucide-react-native';
 
@@ -24,6 +26,7 @@ interface DocumentPickerProps {
   allowedTypes?: DocumentPicker.DocumentPickerOptions['type'];
   label?: string;
   placeholder?: string;
+  storageKey?: string;
 }
 
 export function DocumentPickerComponent({ 
@@ -31,10 +34,42 @@ export function DocumentPickerComponent({
   maxFiles = 5,
   allowedTypes = '*/*',
   label = 'Upload Files',
-  placeholder = 'No files selected'
+  placeholder = 'No files selected',
+  storageKey
 }: DocumentPickerProps) {
   const { colors } = useTheme();
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+
+  React.useEffect(() => {
+    if (storageKey) {
+      loadStoredFiles();
+    }
+  }, [storageKey]);
+
+  const loadStoredFiles = async () => {
+    if (!storageKey) return;
+    
+    try {
+      const storedFiles = await AsyncStorage.getItem(storageKey);
+      if (storedFiles) {
+        const files = JSON.parse(storedFiles);
+        setSelectedFiles(files);
+        onFilesSelected(files);
+      }
+    } catch (error) {
+      console.error('Error loading stored files:', error);
+    }
+  };
+
+  const saveFilesToStorage = async (files: SelectedFile[]) => {
+    if (!storageKey) return;
+    
+    try {
+      await AsyncStorage.setItem(storageKey, JSON.stringify(files));
+    } catch (error) {
+      console.error('Error saving files to storage:', error);
+    }
+  };
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.startsWith('image/')) return Image;
@@ -54,23 +89,53 @@ export function DocumentPickerComponent({
 
   const pickFiles = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: allowedTypes,
-        multiple: maxFiles > 1,
-        copyToCacheDirectory: true,
-      });
+      let result;
+      
+      if (Platform.OS === 'web') {
+        // For web, use the file input approach
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = maxFiles > 1;
+        input.accept = allowedTypes === '*/*' ? '*/*' : allowedTypes as string;
+        
+        return new Promise((resolve) => {
+          input.onchange = (event: any) => {
+            const files = Array.from(event.target.files || []) as File[];
+            const selectedFiles = files.map(file => ({
+              uri: URL.createObjectURL(file),
+              name: file.name,
+              size: file.size,
+              mimeType: file.type,
+            }));
+            
+            const newFiles = [...this.selectedFiles, ...selectedFiles].slice(0, maxFiles);
+            setSelectedFiles(newFiles);
+            onFilesSelected(newFiles);
+            saveFilesToStorage(newFiles);
+            resolve(null);
+          };
+          input.click();
+        });
+      } else {
+        result = await DocumentPicker.getDocumentAsync({
+          type: allowedTypes,
+          multiple: maxFiles > 1,
+          copyToCacheDirectory: true,
+        });
+        
+        if (!result.canceled) {
+          const files = result.assets.map(asset => ({
+            uri: asset.uri,
+            name: asset.name,
+            size: asset.size || 0,
+            mimeType: asset.mimeType || 'application/octet-stream',
+          }));
 
-      if (!result.canceled) {
-        const files = result.assets.map(asset => ({
-          uri: asset.uri,
-          name: asset.name,
-          size: asset.size || 0,
-          mimeType: asset.mimeType || 'application/octet-stream',
-        }));
-
-        const newFiles = [...selectedFiles, ...files].slice(0, maxFiles);
-        setSelectedFiles(newFiles);
-        onFilesSelected(newFiles);
+          const newFiles = [...selectedFiles, ...files].slice(0, maxFiles);
+          setSelectedFiles(newFiles);
+          onFilesSelected(newFiles);
+          saveFilesToStorage(newFiles);
+        }
       }
     } catch (error) {
       console.error('Error picking files:', error);
@@ -82,6 +147,7 @@ export function DocumentPickerComponent({
     const newFiles = selectedFiles.filter((_, i) => i !== index);
     setSelectedFiles(newFiles);
     onFilesSelected(newFiles);
+    saveFilesToStorage(newFiles);
   };
 
   const styles = StyleSheet.create({
