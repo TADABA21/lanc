@@ -15,6 +15,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Save, X, User, Mail, Phone, Briefcase, DollarSign, Calendar, ChevronDown } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditTeamMemberScreen() {
@@ -451,7 +452,7 @@ export default function EditTeamMemberScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Employment Details</Text>
           
-          <View style={[styles.inputGroup, { zIndex: showRoleDropdown ? 1000 : 1 }]}>
+          <View style={[styles.inputGroup, { zIndex: showRoleDropdown ? 3000 : 1 }]}>
             <Text style={styles.label}>
               Role <Text style={styles.required}>*</Text>
             </Text>
@@ -494,7 +495,7 @@ export default function EditTeamMemberScreen() {
             </View>
           </View>
 
-          <View style={[styles.inputGroup, { zIndex: showStatusDropdown ? 1000 : 1 }]}>
+          <View style={[styles.inputGroup, { zIndex: showStatusDropdown ? 2000 : 1 }]}>
             <Text style={styles.label}>Status</Text>
             <View style={styles.dropdown}>
               <TouchableOpacity
@@ -560,23 +561,11 @@ export default function EditTeamMemberScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hire Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showDatepicker}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.hire_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.hire_date}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
+            <DatePicker
+              value={formData.hire_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, hire_date: date }))}
+              placeholder="Select hire date"
+            />
           </View>
 
           <View style={styles.inputGroup}>

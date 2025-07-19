@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Client, TeamMember } from '@/types/database';
 import { ArrowLeft, Calendar, DollarSign, Users, Save, X, ChevronDown, User, Plus, Check } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface ProjectFormProps {
@@ -809,7 +810,7 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Client & Timeline</Text>
           
-          <View style={[styles.inputGroup, { zIndex: showClientDropdown ? 1000 : 1 }]}>
+          <View style={[styles.inputGroup, { zIndex: showClientDropdown ? 2000 : 1 }]}>
             <Text style={styles.label}>Client</Text>
             <View style={styles.dropdown}>
               <TouchableOpacity
@@ -867,44 +868,20 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Start Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showStartDatepicker}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.start_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showStartDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.start_date}
-                mode="date"
-                display="default"
-                onChange={handleStartDateChange}
-              />
-            )}
+            <DatePicker
+              value={formData.start_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, start_date: date }))}
+              placeholder="Select start date"
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>End Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showEndDatepicker}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.end_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showEndDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.end_date}
-                mode="date"
-                display="default"
-                onChange={handleEndDateChange}
-              />
-            )}
+            <DatePicker
+              value={formData.end_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, end_date: date }))}
+              placeholder="Select end date"
+            />
           </View>
         </View>
 

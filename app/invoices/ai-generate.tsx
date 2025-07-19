@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Sparkles,
 } from 'lucide-react-native';
+import { DatePicker } from '@/components/DatePicker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface InvoiceItem {
@@ -876,44 +877,20 @@ export default function AIInvoiceGeneratorScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Issue Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => showDatepicker('issue')}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.issue_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showIssueDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.issue_date}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, 'issue', date)}
-              />
-            )}
+            <DatePicker
+              value={formData.issue_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, issue_date: date }))}
+              placeholder="Select issue date"
+            />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Due Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => showDatepicker('due')}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.due_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showDueDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.due_date}
-                mode="date"
-                display="default"
-                onChange={(event, date) => handleDateChange(event, 'due', date)}
-              />
-            )}
+            <DatePicker
+              value={formData.due_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, due_date: date }))}
+              placeholder="Select due date"
+            />
           </View>
         </View>
 

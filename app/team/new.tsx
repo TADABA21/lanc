@@ -380,7 +380,7 @@ export default function NewTeamMemberScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Employment Details</Text>
           
-          <View style={[styles.inputGroup, { zIndex: showRoleDropdown ? 1000 : 1 }]}>
+          <View style={[styles.inputGroup, { zIndex: showRoleDropdown ? 2000 : 1 }]}>
             <Text style={styles.label}>
               Role <Text style={styles.required}>*</Text>
             </Text>
@@ -451,23 +451,11 @@ export default function NewTeamMemberScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hire Date</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showDatepicker}
-            >
-              <Text style={styles.datePickerText}>
-                {formData.hire_date.toLocaleDateString()}
-              </Text>
-              <Calendar size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-            {showDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={formData.hire_date}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
+            <DatePicker
+              value={formData.hire_date}
+              onChange={(date) => setFormData(prev => ({ ...prev, hire_date: date }))}
+              placeholder="Select hire date"
+            />
           </View>
 
           <View style={styles.inputGroup}>

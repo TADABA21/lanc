@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { Client, Project } from '@/types/database';
 import { ArrowLeft, Save, X, Plus, Trash2, FileText, Calendar, DollarSign, ChevronDown } from 'lucide-react-native';
 import { DatePicker } from '@/components/DatePicker';
+import { DatePicker } from '@/components/DatePicker';
 
 interface InvoiceItem {
   description: string;
