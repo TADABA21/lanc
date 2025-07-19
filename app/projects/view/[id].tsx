@@ -1073,7 +1073,10 @@ export default function ProjectDetailScreen() {
         <StatusDropdown
           currentStatus={project.status}
           options={projectStatusOptions}
-          onStatusChange={updateProjectStatus}
+          onStatusChange={(status: string) => {
+            // Cast status to the correct type and call the async function
+            updateProjectStatus(status as 'todo' | 'in_progress' | 'completed');
+          }}
         />
       </View>
 

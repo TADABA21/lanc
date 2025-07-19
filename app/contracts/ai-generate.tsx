@@ -23,10 +23,6 @@ import {
   FileCheck, 
   ChevronDown,
   Sparkles,
-  Download,
-  Send,
-  User,
-  Building
 } from 'lucide-react-native';
 
 export default function AIContractGeneratorScreen() {
@@ -147,36 +143,31 @@ export default function AIContractGeneratorScreen() {
     setAiGenerating(true);
     
     try {
-      // Enhanced context for better AI generation
       const contractContext = {
         clientName: selectedClient.name,
         clientCompany: selectedClient.company,
         projectName: selectedProject?.name || 'General Services',
-        projectDescription: selectedProject?.description || formData.scope || 'Professional services as agreed upon',
+        projectDescription: selectedProject?.description || formData.scope || 'Professional services',
         contractType: formData.type,
-        scope: formData.scope || 'Professional services to be delivered as per agreement'
+        scope: formData.scope || 'Professional services to be delivered'
       };
 
       const messages = contractPrompts.generateContract(
         contractContext.contractType,
         contractContext.clientName,
         contractContext.projectName,
-        contractContext.scope,
-        contractContext.clientCompany
+        contractContext.scope
       );
       
       const aiResponse = await generateWithGroq(messages);
       
-      // Enhanced content parsing and formatting
       const formatContractContent = (content: string) => {
-        // Clean up the content and ensure proper formatting
         let formattedContent = content
-          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove markdown bold
-          .replace(/#{1,6}\s*/g, '') // Remove markdown headers
-          .replace(/\n{3,}/g, '\n\n') // Normalize line breaks
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/#{1,6}\s*/g, '')
+          .replace(/\n{3,}/g, '\n\n')
           .trim();
         
-        // Ensure proper contract structure
         if (!formattedContent.toUpperCase().includes('SERVICE AGREEMENT') && 
             !formattedContent.toUpperCase().includes('CONTRACT')) {
           formattedContent = `${formData.type.toUpperCase()}\n\n${formattedContent}`;
@@ -191,7 +182,7 @@ export default function AIContractGeneratorScreen() {
         title: prev.title || `${formData.type} - ${selectedClient.name}`,
       }));
       
-      Alert.alert('Success', 'AI has generated a professional contract! Review and edit as needed before saving.');
+      Alert.alert('Success', 'AI has generated a professional contract!');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate contract with AI. Please try again.');
@@ -229,7 +220,7 @@ export default function AIContractGeneratorScreen() {
         .from('activities')
         .insert([{
           type: 'contract_created',
-          title: `AI-generated contract created: ${formData.title}`,
+          title: `Contract created: ${formData.title}`,
           description: `Type: ${formData.type}`,
           entity_type: 'contract',
           entity_id: contract.id,
@@ -414,8 +405,9 @@ export default function AIContractGeneratorScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
-    dropdown: {
+    dropdownContainer: {
       position: 'relative',
+      zIndex: 100,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -448,6 +440,11 @@ export default function AIContractGeneratorScreen() {
       marginTop: 4,
       maxHeight: 200,
       zIndex: 1000,
+      elevation: 1000,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -540,7 +537,7 @@ export default function AIContractGeneratorScreen() {
             <Text style={styles.aiTitle}>AI-Powered Contract Generation</Text>
           </View>
           <Text style={styles.aiDescription}>
-            Generate professional, legally-sound contracts with AI. Include all necessary clauses, terms, and conditions tailored to your specific needs.
+            Generate professional, legally-sound contracts with AI. Include all necessary clauses and terms.
           </Text>
           <TouchableOpacity
             style={[styles.aiButton, (aiGenerating || !formData.client_id || !formData.type) && styles.aiButtonDisabled]}
@@ -578,26 +575,30 @@ export default function AIContractGeneratorScreen() {
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Contract Type <Text style={styles.required}>*</Text>
             </Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowTypeDropdown(!showTypeDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !formData.type && styles.dropdownPlaceholder
-                ]}>
-                  {formData.type || 'Select contract type'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showTypeDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowTypeDropdown(!showTypeDropdown);
+                setShowClientDropdown(false);
+                setShowProjectDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !formData.type && styles.dropdownPlaceholder
+              ]}>
+                {formData.type || 'Select contract type'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showTypeDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   {contractTypes.map((type) => (
                     <TouchableOpacity
                       key={type}
@@ -611,30 +612,34 @@ export default function AIContractGeneratorScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowClientDropdown(!showClientDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !selectedClient && styles.dropdownPlaceholder
-                ]}>
-                  {selectedClient ? selectedClient.name : 'Select a client'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showClientDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowClientDropdown(!showClientDropdown);
+                setShowTypeDropdown(false);
+                setShowProjectDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !selectedClient && styles.dropdownPlaceholder
+              ]}>
+                {selectedClient ? selectedClient.name : 'Select a client'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showClientDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   {clients.map((client) => (
                     <TouchableOpacity
                       key={client.id}
@@ -648,28 +653,32 @@ export default function AIContractGeneratorScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>Project (Optional)</Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowProjectDropdown(!showProjectDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !selectedProject && styles.dropdownPlaceholder
-                ]}>
-                  {selectedProject ? selectedProject.name : 'Select a project'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showProjectDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowProjectDropdown(!showProjectDropdown);
+                setShowTypeDropdown(false);
+                setShowClientDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !selectedProject && styles.dropdownPlaceholder
+              ]}>
+                {selectedProject ? selectedProject.name : 'Select a project'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showProjectDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   <TouchableOpacity
                     style={styles.dropdownItem}
                     onPress={() => {
@@ -692,8 +701,8 @@ export default function AIContractGeneratorScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -702,7 +711,7 @@ export default function AIContractGeneratorScreen() {
               style={[styles.input, styles.textArea]}
               value={formData.scope}
               onChangeText={(text) => setFormData(prev => ({ ...prev, scope: text }))}
-              placeholder="Describe the scope of work (helps AI generate better contract)"
+              placeholder="Describe the scope of work"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={4}
@@ -720,7 +729,7 @@ export default function AIContractGeneratorScreen() {
               style={[styles.input, styles.largeTextArea]}
               value={formData.content}
               onChangeText={(text) => setFormData(prev => ({ ...prev, content: text }))}
-              placeholder="Contract content will be generated by AI or you can write it manually"
+              placeholder="Contract content will be generated by AI"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={12}

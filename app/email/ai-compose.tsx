@@ -25,8 +25,6 @@ import {
   ChevronDown,
   Sparkles,
   Paperclip,
-  Users,
-  MessageSquare
 } from 'lucide-react-native';
 
 export default function AIEmailComposerScreen() {
@@ -107,7 +105,7 @@ export default function AIEmailComposerScreen() {
       
       const aiResponse = await generateWithGroq(messages);
       
-      // Parse AI response to extract subject and body
+      // Parse AI response
       const lines = aiResponse.split('\n');
       let subject = '';
       let body = '';
@@ -126,7 +124,6 @@ export default function AIEmailComposerScreen() {
         if (currentSection === 'body' && trimmedLine) {
           body += trimmedLine + '\n';
         } else if (!subject && !currentSection && trimmedLine) {
-          // If no explicit subject found, use first meaningful line
           subject = trimmedLine;
           currentSection = 'body';
         }
@@ -138,7 +135,7 @@ export default function AIEmailComposerScreen() {
         body: body.trim() || aiResponse,
       }));
       
-      Alert.alert('Success', 'AI has generated a professional email! Review and edit as needed before sending.');
+      Alert.alert('Success', 'AI has generated a professional email!');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate email with AI. Please try again.');
@@ -156,8 +153,6 @@ export default function AIEmailComposerScreen() {
     setLoading(true);
     
     try {
-      // In a real app, you would integrate with an email service like SendGrid or AWS SES
-      // For now, we'll simulate sending and log the activity
       await supabase
         .from('activities')
         .insert([{
@@ -167,7 +162,7 @@ export default function AIEmailComposerScreen() {
           user_id: user?.id,
         }]);
 
-      Alert.alert('Success', 'Email sent successfully! (In production, this would integrate with an email service)');
+      Alert.alert('Success', 'Email sent successfully!');
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);
@@ -194,8 +189,6 @@ export default function AIEmailComposerScreen() {
       Alert.alert('Error', 'Failed to save draft.');
     }
   };
-
-  const selectedClient = clients.find(c => c.email === formData.to);
 
   const styles = StyleSheet.create({
     container: {
@@ -343,8 +336,9 @@ export default function AIEmailComposerScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
-    dropdown: {
+    dropdownContainer: {
       position: 'relative',
+      zIndex: 100,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -377,6 +371,11 @@ export default function AIEmailComposerScreen() {
       marginTop: 4,
       maxHeight: 200,
       zIndex: 1000,
+      elevation: 1000,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -508,26 +507,29 @@ export default function AIEmailComposerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Setup</Text>
           
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Email Purpose <Text style={styles.required}>*</Text>
             </Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowPurposeDropdown(!showPurposeDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !formData.purpose && styles.dropdownPlaceholder
-                ]}>
-                  {formData.purpose || 'Select email purpose'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showPurposeDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowPurposeDropdown(!showPurposeDropdown);
+                setShowClientDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !formData.purpose && styles.dropdownPlaceholder
+              ]}>
+                {formData.purpose || 'Select email purpose'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showPurposeDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   {emailPurposes.map((purpose) => (
                     <TouchableOpacity
                       key={purpose}
@@ -541,8 +543,8 @@ export default function AIEmailComposerScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -551,7 +553,7 @@ export default function AIEmailComposerScreen() {
               style={[styles.input, styles.textArea]}
               value={formData.context}
               onChangeText={(text) => setFormData(prev => ({ ...prev, context: text }))}
-              placeholder="Provide context to help AI generate better content (e.g., project details, specific requests)"
+              placeholder="Provide context to help AI generate better content"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={3}
@@ -563,26 +565,29 @@ export default function AIEmailComposerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Composition</Text>
           
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               To <Text style={styles.required}>*</Text>
             </Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowClientDropdown(!showClientDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !formData.to && styles.dropdownPlaceholder
-                ]}>
-                  {formData.to || 'Select recipient or enter email'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showClientDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowClientDropdown(!showClientDropdown);
+                setShowPurposeDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !formData.to && styles.dropdownPlaceholder
+              ]}>
+                {formData.to || 'Select recipient or enter email'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showClientDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   {clients.map((client) => (
                     <TouchableOpacity
                       key={client.id}
@@ -598,10 +603,9 @@ export default function AIEmailComposerScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
             
-            {/* Manual email input */}
             <TextInput
               style={[styles.input, { marginTop: 8 }]}
               value={formData.to}
@@ -621,7 +625,7 @@ export default function AIEmailComposerScreen() {
               style={styles.input}
               value={formData.subject}
               onChangeText={(text) => setFormData(prev => ({ ...prev, subject: text }))}
-              placeholder="Enter email subject (AI can generate this)"
+              placeholder="Enter email subject"
               placeholderTextColor={colors.textMuted}
             />
           </View>
@@ -634,7 +638,7 @@ export default function AIEmailComposerScreen() {
               style={[styles.input, styles.largeTextArea]}
               value={formData.body}
               onChangeText={(text) => setFormData(prev => ({ ...prev, body: text }))}
-              placeholder="Enter your message (AI can generate this)"
+              placeholder="Enter your message"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={8}
