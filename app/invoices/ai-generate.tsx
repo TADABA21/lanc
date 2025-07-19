@@ -30,7 +30,6 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { DatePicker } from '@/components/DatePicker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface InvoiceItem {
   description: string;
@@ -65,8 +64,6 @@ export default function AIInvoiceGeneratorScreen() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
-  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -224,39 +221,6 @@ export default function AIInvoiceGeneratorScreen() {
       Alert.alert('Error', 'Failed to generate content with AI. Please try again.');
     } finally {
       setAiGenerating(false);
-    }
-  };
-
-  const handleDateChange = (event: any, type: 'issue' | 'due', selectedDate?: Date) => {
-    const currentDate = selectedDate || (type === 'issue' ? formData.issue_date : formData.due_date);
-    if (type === 'issue') {
-      setShowIssueDatePicker(false);
-      setFormData(prev => ({ ...prev, issue_date: currentDate }));
-    } else {
-      setShowDueDatePicker(false);
-      setFormData(prev => ({ ...prev, due_date: currentDate }));
-    }
-  };
-
-  const showDatepicker = (type: 'issue' | 'due') => {
-    if (Platform.OS === 'web') {
-      const currentDate = type === 'issue' ? formData.issue_date : formData.due_date;
-      const dateString = prompt('Enter date (YYYY-MM-DD):', currentDate.toISOString().split('T')[0]);
-      if (dateString) {
-        const date = new Date(dateString);
-        if (!isNaN(date.getTime())) {
-          setFormData(prev => ({ 
-            ...prev, 
-            [type === 'issue' ? 'issue_date' : 'due_date']: date 
-          }));
-        }
-      }
-    } else {
-      if (type === 'issue') {
-        setShowIssueDatePicker(true);
-      } else {
-        setShowDueDatePicker(true);
-      }
     }
   };
 

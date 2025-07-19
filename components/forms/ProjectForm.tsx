@@ -18,7 +18,6 @@ import { supabase } from '@/lib/supabase';
 import { Client, TeamMember } from '@/types/database';
 import { ArrowLeft, Calendar, DollarSign, Users, Save, X, ChevronDown, User, Plus, Check } from 'lucide-react-native';
 import { DatePicker } from '@/components/DatePicker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface ProjectFormProps {
   projectId?: string;
@@ -49,8 +48,6 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showTeamSelector, setShowTeamSelector] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   
   // New client form state
   const [newClientData, setNewClientData] = useState({
@@ -301,46 +298,6 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         ? prev.filter(id => id !== memberId)
         : [...prev, memberId]
     );
-  };
-
-  const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || formData.start_date;
-    setShowStartDatePicker(false);
-    setFormData(prev => ({ ...prev, start_date: currentDate }));
-  };
-
-  const handleEndDateChange = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || formData.end_date;
-    setShowEndDatePicker(false);
-    setFormData(prev => ({ ...prev, end_date: currentDate }));
-  };
-
-  const showStartDatepicker = () => {
-    if (Platform.OS === 'web') {
-      const dateString = prompt('Enter start date (YYYY-MM-DD):', formData.start_date.toISOString().split('T')[0]);
-      if (dateString) {
-        const date = new Date(dateString);
-        if (!isNaN(date.getTime())) {
-          setFormData(prev => ({ ...prev, start_date: date }));
-        }
-      }
-    } else {
-      setShowStartDatePicker(true);
-    }
-  };
-
-  const showEndDatepicker = () => {
-    if (Platform.OS === 'web') {
-      const dateString = prompt('Enter end date (YYYY-MM-DD):', formData.end_date.toISOString().split('T')[0]);
-      if (dateString) {
-        const date = new Date(dateString);
-        if (!isNaN(date.getTime())) {
-          setFormData(prev => ({ ...prev, end_date: date }));
-        }
-      }
-    } else {
-      setShowEndDatePicker(true);
-    }
   };
 
   const selectedClient = clients.find(c => c.id === formData.client_id);

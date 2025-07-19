@@ -16,7 +16,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Save, X, User, Mail, Phone, Briefcase, DollarSign, Calendar, ChevronDown } from 'lucide-react-native';
 import { DatePicker } from '@/components/DatePicker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditTeamMemberScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,7 +39,6 @@ export default function EditTeamMemberScreen() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const roles = [
     'Software Developer',
@@ -145,26 +143,6 @@ export default function EditTeamMemberScreen() {
       Alert.alert('Error', 'Failed to update team member. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || formData.hire_date;
-    setShowDatePicker(false);
-    setFormData(prev => ({ ...prev, hire_date: currentDate }));
-  };
-
-  const showDatepicker = () => {
-    if (Platform.OS === 'web') {
-      const dateString = prompt('Enter hire date (YYYY-MM-DD):', formData.hire_date.toISOString().split('T')[0]);
-      if (dateString) {
-        const date = new Date(dateString);
-        if (!isNaN(date.getTime())) {
-          setFormData(prev => ({ ...prev, hire_date: date }));
-        }
-      }
-    } else {
-      setShowDatePicker(true);
     }
   };
 

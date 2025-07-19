@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Calendar, X } from 'lucide-react-native';
 
@@ -33,15 +32,11 @@ export function DatePicker({
   const [dateInput, setDateInput] = useState(value.toISOString().split('T')[0]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowPicker(false);
-    }
+    setShowPicker(false);
     
     if (selectedDate) {
       setTempDate(selectedDate);
-      if (Platform.OS === 'android') {
-        onChange(selectedDate);
-      }
+      onChange(selectedDate);
     }
   };
 
@@ -224,15 +219,28 @@ export function DatePicker({
                 onChangeText={handleWebDateChange}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={colors.textMuted}
+                type="date"
               />
             ) : (
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                textColor={colors.text}
-              />
+              <View style={{ padding: 20 }}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  fontFamily: 'Inter-Regular', 
+                  color: colors.text,
+                  textAlign: 'center' 
+                }}>
+                  {tempDate.toLocaleDateString()}
+                </Text>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontFamily: 'Inter-Regular', 
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                  marginTop: 8
+                }}>
+                  Use the input above to change the date
+                </Text>
+              </View>
             )}
             
             <View style={styles.modalActions}>
