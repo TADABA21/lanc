@@ -63,7 +63,7 @@ export default function TestimonialsScreen() {
     try {
       await Share.share({
         message: `Check out our client testimonials! We have ${testimonials.length} reviews with an average rating of ${averageRating.toFixed(1)} stars.`,
-        url: `https://testimonials.example.com/${user?.id}`, // Replace with your actual testimonials page
+        url: `${window.location.origin}/testimonials/public/${user?.id}`,
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -400,10 +400,19 @@ export default function TestimonialsScreen() {
               Share this link with clients to collect testimonials
             </Text>
             <Text style={styles.linkUrl}>
-              https://testimonials.example.com/{user?.id}
+              {Platform.OS === 'web' ? `${window.location.origin}/testimonials/public/${user?.id}` : `testimonials.app/public/${user?.id}`}
             </Text>
           </View>
-          <TouchableOpacity style={styles.linkButton}>
+          <TouchableOpacity 
+            style={styles.linkButton}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open(`${window.location.origin}/testimonials/public/${user?.id}`, '_blank');
+              } else {
+                handleShare();
+              }
+            }}
+          >
             <ExternalLink size={16} color={colors.primary} />
           </TouchableOpacity>
         </View>

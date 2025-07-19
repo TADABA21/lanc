@@ -365,6 +365,19 @@ export default function AIContractGeneratorScreen() {
     },
     inputGroup: {
       marginBottom: 20,
+      zIndex: 1,
+    },
+    typeDropdownGroup: {
+      marginBottom: 20,
+      zIndex: 4000,
+    },
+    clientDropdownGroup: {
+      marginBottom: 20,
+      zIndex: 3000,
+    },
+    projectDropdownGroup: {
+      marginBottom: 20,
+      zIndex: 2000,
     },
     label: {
       fontSize: 14,
@@ -407,7 +420,7 @@ export default function AIContractGeneratorScreen() {
     },
     dropdownContainer: {
       position: 'relative',
-      zIndex: 100,
+      zIndex: 1000,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -439,8 +452,8 @@ export default function AIContractGeneratorScreen() {
       borderRadius: 12,
       marginTop: 4,
       maxHeight: 200,
-      zIndex: 1000,
-      elevation: 1000,
+      zIndex: 10000,
+      elevation: 10000,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
@@ -575,7 +588,7 @@ export default function AIContractGeneratorScreen() {
             </View>
           </View>
 
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.typeDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Contract Type <Text style={styles.required}>*</Text>
             </Text>
@@ -616,7 +629,7 @@ export default function AIContractGeneratorScreen() {
             )}
           </View>
 
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.clientDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
@@ -657,7 +670,7 @@ export default function AIContractGeneratorScreen() {
             )}
           </View>
 
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.projectDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>Project (Optional)</Text>
             <TouchableOpacity
               style={styles.dropdownButton}

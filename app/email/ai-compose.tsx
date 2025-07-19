@@ -315,6 +315,15 @@ export default function AIEmailComposerScreen() {
     },
     inputGroup: {
       marginBottom: 16,
+      zIndex: 1,
+    },
+    dropdownInputGroup: {
+      marginBottom: 16,
+      zIndex: 1000,
+    },
+    purposeDropdownGroup: {
+      marginBottom: 16,
+      zIndex: 2000,
     },
     label: {
       fontSize: 14,
@@ -370,8 +379,8 @@ export default function AIEmailComposerScreen() {
       borderRadius: 12,
       marginTop: 4,
       maxHeight: 200,
-      zIndex: 1000,
-      elevation: 1000,
+      zIndex: 10000,
+      elevation: 10000,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
@@ -507,7 +516,7 @@ export default function AIEmailComposerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Setup</Text>
           
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.purposeDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Email Purpose <Text style={styles.required}>*</Text>
             </Text>
@@ -565,7 +574,7 @@ export default function AIEmailComposerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Composition</Text>
           
-          <View style={[styles.inputGroup, styles.dropdownContainer]}>
+          <View style={[styles.dropdownInputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               To <Text style={styles.required}>*</Text>
             </Text>
