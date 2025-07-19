@@ -8,8 +8,8 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
-  Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -28,10 +28,8 @@ import {
   DollarSign, 
   ChevronDown,
   Sparkles,
-  Download,
-  Send
 } from 'lucide-react-native';
-import { DatePicker } from '@/components/DatePicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface InvoiceItem {
   description: string;
@@ -66,7 +64,8 @@ export default function AIInvoiceGeneratorScreen() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -176,7 +175,6 @@ export default function AIInvoiceGeneratorScreen() {
     setAiGenerating(true);
     
     try {
-      // Prepare line items for AI context
       const itemsContext = items
         .filter(item => item.description.trim())
         .map(item => ({
@@ -194,7 +192,6 @@ export default function AIInvoiceGeneratorScreen() {
       
       const aiResponse = await generateWithGroq(messages);
       
-      // Enhanced parsing for better AI response handling
       const parseAIResponse = (response: string) => {
         const sections = response.split(/(?:^|\n)(?=\d+\.|[A-Z][a-z]+:|\*\*)/);
         let notes = '';
@@ -216,16 +213,49 @@ export default function AIInvoiceGeneratorScreen() {
       
       setFormData(prev => ({
         ...prev,
-        notes: notes || 'Thank you for your business. We appreciate the opportunity to work with you and look forward to continuing our professional relationship.',
-        terms: terms || 'Payment is due within 30 days of invoice date. Late payments may incur additional fees. Please remit payment to the address listed above.',
+        notes: notes || 'Thank you for your business. We appreciate the opportunity to work with you.',
+        terms: terms || 'Payment is due within 30 days of invoice date.',
       }));
       
-      Alert.alert('Success', 'AI has generated professional invoice content! Review and edit as needed before saving.');
+      Alert.alert('Success', 'AI has generated professional invoice content!');
     } catch (error) {
       console.error('Error generating with AI:', error);
       Alert.alert('Error', 'Failed to generate content with AI. Please try again.');
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  const handleDateChange = (event: any, type: 'issue' | 'due', selectedDate?: Date) => {
+    const currentDate = selectedDate || (type === 'issue' ? formData.issue_date : formData.due_date);
+    if (type === 'issue') {
+      setShowIssueDatePicker(false);
+      setFormData(prev => ({ ...prev, issue_date: currentDate }));
+    } else {
+      setShowDueDatePicker(false);
+      setFormData(prev => ({ ...prev, due_date: currentDate }));
+    }
+  };
+
+  const showDatepicker = (type: 'issue' | 'due') => {
+    if (Platform.OS === 'web') {
+      const currentDate = type === 'issue' ? formData.issue_date : formData.due_date;
+      const dateString = prompt('Enter date (YYYY-MM-DD):', currentDate.toISOString().split('T')[0]);
+      if (dateString) {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          setFormData(prev => ({ 
+            ...prev, 
+            [type === 'issue' ? 'issue_date' : 'due_date']: date 
+          }));
+        }
+      }
+    } else {
+      if (type === 'issue') {
+        setShowIssueDatePicker(true);
+      } else {
+        setShowDueDatePicker(true);
+      }
     }
   };
 
@@ -269,7 +299,7 @@ export default function AIInvoiceGeneratorScreen() {
         .from('activities')
         .insert([{
           type: 'invoice_created',
-          title: `AI-generated invoice created: ${formData.invoice_number}`,
+          title: `Invoice created: ${formData.invoice_number}`,
           description: `Total: $${total.toFixed(2)}`,
           entity_type: 'invoice',
           entity_id: invoice.id,
@@ -454,8 +484,9 @@ export default function AIInvoiceGeneratorScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
-    dropdown: {
+    dropdownContainer: {
       position: 'relative',
+      zIndex: 100,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -488,6 +519,11 @@ export default function AIInvoiceGeneratorScreen() {
       marginTop: 4,
       maxHeight: 200,
       zIndex: 1000,
+      elevation: 1000,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -618,6 +654,22 @@ export default function AIInvoiceGeneratorScreen() {
       minHeight: 80,
       textAlignVertical: 'top',
     },
+    datePickerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    datePickerText: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
+    },
     actionButtons: {
       flexDirection: 'row',
       paddingHorizontal: 24,
@@ -690,7 +742,7 @@ export default function AIInvoiceGeneratorScreen() {
             <Text style={styles.aiTitle}>AI-Powered Invoice Generation</Text>
           </View>
           <Text style={styles.aiDescription}>
-            Let AI generate professional invoice content, terms, and payment conditions based on your client and project information.
+            Let AI generate professional invoice content, terms, and payment conditions.
           </Text>
           <TouchableOpacity
             style={[styles.aiButton, (aiGenerating || !formData.client_id) && styles.aiButtonDisabled]}
@@ -726,26 +778,29 @@ export default function AIInvoiceGeneratorScreen() {
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowClientDropdown(!showClientDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !selectedClient && styles.dropdownPlaceholder
-                ]}>
-                  {selectedClient ? selectedClient.name : 'Select a client'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showClientDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowClientDropdown(!showClientDropdown);
+                setShowProjectDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !selectedClient && styles.dropdownPlaceholder
+              ]}>
+                {selectedClient ? selectedClient.name : 'Select a client'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showClientDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   {clients.map((client) => (
                     <TouchableOpacity
                       key={client.id}
@@ -759,28 +814,31 @@ export default function AIInvoiceGeneratorScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>Project (Optional)</Text>
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowProjectDropdown(!showProjectDropdown)}
-              >
-                <Text style={[
-                  styles.dropdownText,
-                  !selectedProject && styles.dropdownPlaceholder
-                ]}>
-                  {selectedProject ? selectedProject.name : 'Select a project'}
-                </Text>
-                <ChevronDown size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-              
-              {showProjectDropdown && (
-                <ScrollView style={styles.dropdownList}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => {
+                setShowProjectDropdown(!showProjectDropdown);
+                setShowClientDropdown(false);
+              }}
+            >
+              <Text style={[
+                styles.dropdownText,
+                !selectedProject && styles.dropdownPlaceholder
+              ]}>
+                {selectedProject ? selectedProject.name : 'Select a project'}
+              </Text>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            
+            {showProjectDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }}>
                   <TouchableOpacity
                     style={styles.dropdownItem}
                     onPress={() => {
@@ -803,26 +861,50 @@ export default function AIInvoiceGeneratorScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Issue Date</Text>
-            <DatePicker
-              value={formData.issue_date}
-              onChange={(date) => setFormData(prev => ({ ...prev, issue_date: date }))}
-              placeholder="Select issue date"
-            />
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => showDatepicker('issue')}
+            >
+              <Text style={styles.datePickerText}>
+                {formData.issue_date.toLocaleDateString()}
+              </Text>
+              <Calendar size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showIssueDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.issue_date}
+                mode="date"
+                display="default"
+                onChange={(event, date) => handleDateChange(event, 'issue', date)}
+              />
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Due Date</Text>
-            <DatePicker
-              value={formData.due_date}
-              onChange={(date) => setFormData(prev => ({ ...prev, due_date: date }))}
-              placeholder="Select due date"
-            />
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => showDatepicker('due')}
+            >
+              <Text style={styles.datePickerText}>
+                {formData.due_date.toLocaleDateString()}
+              </Text>
+              <Calendar size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showDueDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.due_date}
+                mode="date"
+                display="default"
+                onChange={(event, date) => handleDateChange(event, 'due', date)}
+              />
+            )}
           </View>
         </View>
 
@@ -922,7 +1004,7 @@ export default function AIInvoiceGeneratorScreen() {
               style={[styles.input, styles.textArea]}
               value={formData.notes}
               onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))}
-              placeholder="Add any notes for the client (AI can generate this)"
+              placeholder="Add any notes for the client"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={3}
@@ -935,7 +1017,7 @@ export default function AIInvoiceGeneratorScreen() {
               style={[styles.input, styles.textArea]}
               value={formData.terms}
               onChangeText={(text) => setFormData(prev => ({ ...prev, terms: text }))}
-              placeholder="Payment terms and conditions (AI can generate this)"
+              placeholder="Payment terms and conditions"
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={3}
@@ -948,7 +1030,7 @@ export default function AIInvoiceGeneratorScreen() {
       <View style={styles.actionButtons}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.secondaryActionButton]}
-          onPress={() => setShowPreview(true)}
+          onPress={() => Alert.alert('Preview', 'Invoice preview functionality would be implemented here')}
         >
           <FileText size={16} color={colors.primary} />
           <Text style={[styles.actionButtonText, styles.secondaryActionButtonText]}>

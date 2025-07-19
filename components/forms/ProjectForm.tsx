@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Client, TeamMember } from '@/types/database';
 import { ArrowLeft, Calendar, DollarSign, Users, Save, X, ChevronDown, User, Plus, Check } from 'lucide-react-native';
-import { DatePicker } from '@/components/DatePicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface ProjectFormProps {
   projectId?: string;
@@ -48,6 +48,8 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showTeamSelector, setShowTeamSelector] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   
   // New client form state
   const [newClientData, setNewClientData] = useState({
@@ -129,7 +131,7 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       });
 
       // Set selected team members
-      const memberIds = data.project_members?.map(pm => pm.team_member_id) || [];
+      const memberIds = data.project_members?.map((pm: { team_member_id: string }) => pm.team_member_id) || [];
       setSelectedTeamMembers(memberIds);
     } catch (error) {
       console.error('Error fetching project:', error);
@@ -298,6 +300,46 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         ? prev.filter(id => id !== memberId)
         : [...prev, memberId]
     );
+  };
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || formData.start_date;
+    setShowStartDatePicker(false);
+    setFormData(prev => ({ ...prev, start_date: currentDate }));
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || formData.end_date;
+    setShowEndDatePicker(false);
+    setFormData(prev => ({ ...prev, end_date: currentDate }));
+  };
+
+  const showStartDatepicker = () => {
+    if (Platform.OS === 'web') {
+      const dateString = prompt('Enter start date (YYYY-MM-DD):', formData.start_date.toISOString().split('T')[0]);
+      if (dateString) {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          setFormData(prev => ({ ...prev, start_date: date }));
+        }
+      }
+    } else {
+      setShowStartDatePicker(true);
+    }
+  };
+
+  const showEndDatepicker = () => {
+    if (Platform.OS === 'web') {
+      const dateString = prompt('Enter end date (YYYY-MM-DD):', formData.end_date.toISOString().split('T')[0]);
+      if (dateString) {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          setFormData(prev => ({ ...prev, end_date: date }));
+        }
+      }
+    } else {
+      setShowEndDatePicker(true);
+    }
   };
 
   const selectedClient = clients.find(c => c.id === formData.client_id);
@@ -547,6 +589,30 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
       fontFamily: 'Inter-SemiBold',
       color: 'white',
     },
+    datePickerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    datePickerText: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
+    },
+    datePickerPlaceholder: {
+      color: colors.textMuted,
+    },
     // Modal styles
     modalOverlay: {
       flex: 1,
@@ -743,7 +809,7 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Client & Timeline</Text>
           
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, { zIndex: showClientDropdown ? 1000 : 1 }]}>
             <Text style={styles.label}>Client</Text>
             <View style={styles.dropdown}>
               <TouchableOpacity
@@ -801,20 +867,44 @@ export function ProjectForm({ projectId, onSave, onCancel }: ProjectFormProps) {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Start Date</Text>
-            <DatePicker
-              value={formData.start_date}
-              onChange={(date) => setFormData(prev => ({ ...prev, start_date: date }))}
-              placeholder="Select start date"
-            />
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={showStartDatepicker}
+            >
+              <Text style={styles.datePickerText}>
+                {formData.start_date.toLocaleDateString()}
+              </Text>
+              <Calendar size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showStartDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.start_date}
+                mode="date"
+                display="default"
+                onChange={handleStartDateChange}
+              />
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>End Date</Text>
-            <DatePicker
-              value={formData.end_date}
-              onChange={(date) => setFormData(prev => ({ ...prev, end_date: date }))}
-              placeholder="Select end date"
-            />
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={showEndDatepicker}
+            >
+              <Text style={styles.datePickerText}>
+                {formData.end_date.toLocaleDateString()}
+              </Text>
+              <Calendar size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showEndDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.end_date}
+                mode="date"
+                display="default"
+                onChange={handleEndDateChange}
+              />
+            )}
           </View>
         </View>
 

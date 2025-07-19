@@ -8,13 +8,14 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Save, X, User, Mail, Phone, Briefcase, DollarSign, Calendar, ChevronDown } from 'lucide-react-native';
-import { DatePicker } from '@/components/DatePicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function NewTeamMemberScreen() {
   const { colors } = useTheme();
@@ -34,6 +35,7 @@ export default function NewTeamMemberScreen() {
   
   const [loading, setLoading] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const roles = [
     'Software Developer',
@@ -74,7 +76,6 @@ export default function NewTeamMemberScreen() {
       
       if (error) throw error;
 
-      // Create activity log
       await supabase
         .from('activities')
         .insert([{
@@ -92,6 +93,26 @@ export default function NewTeamMemberScreen() {
       Alert.alert('Error', 'Failed to add team member. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || formData.hire_date;
+    setShowDatePicker(false);
+    setFormData(prev => ({ ...prev, hire_date: currentDate }));
+  };
+
+  const showDatepicker = () => {
+    if (Platform.OS === 'web') {
+      const dateString = prompt('Enter hire date (YYYY-MM-DD):', formData.hire_date.toISOString().split('T')[0]);
+      if (dateString) {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          setFormData(prev => ({ ...prev, hire_date: date }));
+        }
+      }
+    } else {
+      setShowDatePicker(true);
     }
   };
 
@@ -199,6 +220,7 @@ export default function NewTeamMemberScreen() {
     },
     dropdown: {
       position: 'relative',
+      zIndex: 1000,
     },
     dropdownButton: {
       flexDirection: 'row',
@@ -230,7 +252,12 @@ export default function NewTeamMemberScreen() {
       borderRadius: 12,
       marginTop: 4,
       maxHeight: 200,
-      zIndex: 1000,
+      zIndex: 1001,
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -242,6 +269,25 @@ export default function NewTeamMemberScreen() {
       fontSize: 16,
       fontFamily: 'Inter-Regular',
       color: colors.text,
+    },
+    datePickerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    datePickerText: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
+    },
+    datePickerPlaceholder: {
+      color: colors.textMuted,
     },
   });
 
@@ -334,7 +380,7 @@ export default function NewTeamMemberScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Employment Details</Text>
           
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, { zIndex: showRoleDropdown ? 1000 : 1 }]}>
             <Text style={styles.label}>
               Role <Text style={styles.required}>*</Text>
             </Text>
@@ -353,7 +399,10 @@ export default function NewTeamMemberScreen() {
               </TouchableOpacity>
               
               {showRoleDropdown && (
-                <ScrollView style={styles.dropdownList}>
+                <ScrollView 
+                  style={styles.dropdownList}
+                  nestedScrollEnabled={true}
+                >
                   {roles.map((role) => (
                     <TouchableOpacity
                       key={role}
@@ -402,11 +451,23 @@ export default function NewTeamMemberScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hire Date</Text>
-            <DatePicker
-              value={formData.hire_date}
-              onChange={(date) => setFormData(prev => ({ ...prev, hire_date: date }))}
-              placeholder="Select hire date"
-            />
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={showDatepicker}
+            >
+              <Text style={styles.datePickerText}>
+                {formData.hire_date.toLocaleDateString()}
+              </Text>
+              <Calendar size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {showDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={formData.hire_date}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
           </View>
 
           <View style={styles.inputGroup}>

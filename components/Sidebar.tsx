@@ -268,7 +268,6 @@ export function Sidebar() {
       marginHorizontal: 12,
       borderRadius: 12,
       backgroundColor: 'transparent',
-      transition: 'all 0.2s ease',
     },
     navItemActive: {
       backgroundColor: colors.primaryLight,
