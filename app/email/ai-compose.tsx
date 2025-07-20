@@ -151,6 +151,13 @@ export default function AIEmailComposerScreen() {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.to)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -159,10 +166,14 @@ export default function AIEmailComposerScreen() {
         to: formData.to,
         subject: formData.subject,
         body: formData.body,
+        from: `${user?.email} <noreply@resend.dev>`, // Use user's email as display name
       });
 
       if (!emailResult.success) {
-        throw new Error(emailResult.error || 'Failed to send email');
+        // Show more detailed error information
+        const errorMessage = emailResult.error || 'Failed to send email';
+        console.error('Email send error:', emailResult.details);
+        throw new Error(errorMessage);
       }
 
       // Log the email activity
@@ -171,18 +182,38 @@ export default function AIEmailComposerScreen() {
         .insert([{
           type: 'email_sent',
           title: `Email sent: ${formData.subject}`,
-          description: `To: ${formData.to}${emailResult.messageId ? ` (ID: ${emailResult.messageId})` : ''}`,
+          description: `To: ${formData.to}${emailResult.messageId ? `\nMessage ID: ${emailResult.messageId}` : ''}`,
+          entity_type: 'email',
+          entity_id: emailResult.messageId,
           user_id: user?.id,
         }]);
 
-      Alert.alert(
-        'Email Sent!', 
-        `Your email has been delivered to ${formData.to}${emailResult.messageId ? `\n\nMessage ID: ${emailResult.messageId}` : ''}`
-      );
+      // Show success message with more details
+      const successMessage = `Your email has been sent successfully to ${formData.to}`;
+      const detailMessage = emailResult.messageId 
+        ? `\n\nMessage ID: ${emailResult.messageId}\n\nThe recipient should receive your email shortly.`
+        : '\n\nThe recipient should receive your email shortly.';
+      
+      Alert.alert('Email Sent! ✅', successMessage + detailMessage);
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);
-      Alert.alert('Error', `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Provide helpful error messages
+      let errorMessage = 'Failed to send email. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('API key')) {
+          errorMessage = 'Email service configuration error. Please contact support.';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Too many emails sent. Please wait a moment and try again.';
+        } else if (error.message.includes('invalid')) {
+          errorMessage = 'Invalid email address or content. Please check and try again.';
+        } else {
+          errorMessage = `Send failed: ${error.message}`;
+        }
+      }
+      
+      Alert.alert('Send Failed ❌', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -196,6 +227,7 @@ export default function AIEmailComposerScreen() {
           type: 'email_draft_saved',
           title: `Email draft saved: ${formData.subject || 'Untitled'}`,
           description: `To: ${formData.to}`,
+          entity_type: 'email_draft',
           user_id: user?.id,
         }]);
 
