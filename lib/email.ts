@@ -1,69 +1,86 @@
-// Email service integration
+// lib/email.ts
+import { createClient } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export interface EmailData {
   to: string;
   subject: string;
   body: string;
   from?: string;
+  cc?: string[];
+  bcc?: string[];
+  replyTo?: string;
 }
 
 export interface EmailResponse {
   success: boolean;
   messageId?: string;
   error?: string;
+  details?: any;
 }
 
-// Using Resend API for email sending
-export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
-  const RESEND_API_KEY = process.env.EXPO_PUBLIC_RESEND_API_KEY;
-  
-  if (!RESEND_API_KEY) {
-    console.warn('No Resend API key found. Email will be simulated.');
-    return simulateEmailSend(emailData);
+export async function sendEmail(
+  emailData: EmailData,
+  user?: User | null
+): Promise<EmailResponse> {
+  // Validate email data
+  if (!emailData.to || !emailData.subject || !emailData.body) {
+    return {
+      success: false,
+      error: 'Missing required email fields (to, subject, or body)',
+    };
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailData.to)) {
+    return {
+      success: false,
+      error: 'Invalid email address format',
+    };
   }
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+    const { data, error } = await supabase.functions.invoke('send-email', {
       body: JSON.stringify({
-        from: emailData.from || 'noreply@yourdomain.com',
-        to: [emailData.to],
-        subject: emailData.subject,
-        html: formatEmailBody(emailData.body),
+        ...emailData,
+        from: emailData.from || 
+             `${user?.user_metadata?.full_name || 'Business Manager'} <${user?.email || 'noreply@resend.dev'}>`
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to send email');
+    if (error) {
+      throw error;
     }
 
-    const data = await response.json();
     return {
       success: true,
-      messageId: data.id,
+      messageId: data?.messageId,
+      details: data,
     };
   } catch (error) {
     console.error('Error sending email:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Failed to send email',
+      details: error,
     };
   }
 }
 
 // Fallback simulation for development/testing
-async function simulateEmailSend(emailData: EmailData): Promise<EmailResponse> {
-  // Simulate network delay
+export async function simulateEmailSend(emailData: EmailData): Promise<EmailResponse> {
   await new Promise(resolve => setTimeout(resolve, 1000));
   
   console.log('📧 Email Simulation:');
   console.log('To:', emailData.to);
   console.log('Subject:', emailData.subject);
-  console.log('Body:', emailData.body);
+  console.log('Body Preview:', emailData.body.substring(0, 100) + '...');
   
   return {
     success: true,
@@ -72,64 +89,55 @@ async function simulateEmailSend(emailData: EmailData): Promise<EmailResponse> {
 }
 
 // Format plain text to HTML
-function formatEmailBody(body: string): string {
+export function formatEmailBody(body: string): string {
   return body
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(line => `<p>${line}</p>`)
+    .map(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine.length === 0) return '<br>';
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const linkedLine = trimmedLine.replace(urlRegex, '<a href="$1" style="color: #3B82F6;">$1</a>');
+      return `<p style="margin: 8px 0; line-height: 1.5;">${linkedLine}</p>`;
+    })
     .join('');
 }
 
-// Alternative email services you can use:
+// Alternative email services
 export const EMAIL_SERVICES = {
   RESEND: 'resend',
   SENDGRID: 'sendgrid',
   MAILGUN: 'mailgun',
   SMTP: 'smtp',
+  POSTMARK: 'postmark',
 } as const;
 
 // SendGrid implementation (alternative)
-export async function sendEmailWithSendGrid(emailData: EmailData): Promise<EmailResponse> {
-  const SENDGRID_API_KEY = process.env.EXPO_PUBLIC_SENDGRID_API_KEY;
-  
-  if (!SENDGRID_API_KEY) {
-    return simulateEmailSend(emailData);
-  }
-
+export async function sendEmailWithSendGrid(
+  emailData: EmailData,
+  user?: User | null
+): Promise<EmailResponse> {
   try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+    const { data, error } = await supabase.functions.invoke('send-email-sendgrid', {
       body: JSON.stringify({
-        personalizations: [{
-          to: [{ email: emailData.to }],
-          subject: emailData.subject,
-        }],
-        from: { email: emailData.from || 'noreply@yourdomain.com' },
-        content: [{
-          type: 'text/html',
-          value: formatEmailBody(emailData.body),
-        }],
+        ...emailData,
+        from: emailData.from || 
+             `${user?.user_metadata?.full_name || 'Business Manager'} <${user?.email || 'noreply@resend.dev'}>`
       }),
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send email via SendGrid');
+    if (error) {
+      throw error;
     }
 
     return {
       success: true,
-      messageId: response.headers.get('x-message-id') || undefined,
+      messageId: data?.messageId,
     };
   } catch (error) {
     console.error('Error sending email with SendGrid:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Failed to send email via SendGrid',
     };
   }
 }
