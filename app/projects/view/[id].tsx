@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusDropdown } from '@/components/StatusDropdown';
 import { TimerWidget } from '@/components/TimerWidget';
 import { DocumentPickerComponent } from '@/components/DocumentPicker';
+import { UploadedFile } from '@/lib/fileUpload';
 
 type ProjectWithRelations = Project & {
   client?: Client;
@@ -756,22 +757,61 @@ export default function ProjectDetailScreen() {
 
   const handleFilesSelected = async (files: any[]) => {
     try {
-      // In a real app, you would upload files to cloud storage
-      // For now, we'll just add them to the local state
-      const newFiles = files.map(file => ({
-        id: Date.now().toString() + Math.random(),
+      // Files are handled by the DocumentPicker component
+      console.log('Files selected:', files);
+    } catch (error) {
+      console.error('Error handling files:', error);
+      Alert.alert('Error', 'Failed to upload files');
+    }
+  };
+
+  const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
+    try {
+      // Save file records to database
+      const fileRecords = uploadedFiles.map(file => ({
+        project_id: id,
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        file_url: file.url,
+        uploaded_by: user?.id,
+      }));
+
+      const { error } = await supabase
+        .from('project_files')
+        .insert(fileRecords);
+
+      if (error) throw error;
+
+      // Update local state
+      const newFiles = uploadedFiles.map(file => ({
+        id: file.id,
         name: file.name,
         size: file.size,
-        type: file.mimeType,
-        url: file.uri,
+        type: file.type,
+        url: file.url,
         uploaded_at: new Date().toISOString(),
       }));
       
       setFiles(prev => [...prev, ...newFiles]);
-      Alert.alert('Success', `${files.length} file(s) uploaded successfully!`);
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'files_uploaded',
+          title: `${uploadedFiles.length} file(s) uploaded to project`,
+          description: `Files: ${uploadedFiles.map(f => f.name).join(', ')}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user?.id,
+        }]);
+
+      await fetchActivities();
+      Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully!`);
     } catch (error) {
-      console.error('Error handling files:', error);
-      Alert.alert('Error', 'Failed to upload files');
+      console.error('Error saving uploaded files:', error);
+      Alert.alert('Error', 'Files uploaded but failed to save records');
     }
   };
 
@@ -1305,10 +1345,14 @@ export default function ProjectDetailScreen() {
 
             <DocumentPickerComponent
               onFilesSelected={handleFilesSelected}
+              onFilesUploaded={handleFilesUploaded}
               maxFiles={10}
               label=""
               placeholder="Select files to upload"
               storageKey={`project_files_${id}`}
+              autoUpload={true}
+              uploadBucket="project-files"
+              uploadFolder={`projects/${id}`}
             />
 
             <View style={styles.modalActions}>
