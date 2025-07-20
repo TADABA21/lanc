@@ -15,6 +15,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { generateWithGroq, emailPrompts } from '@/lib/groq';
+import { sendEmail } from '@/lib/email';
 import { Client } from '@/types/database';
 import { 
   ArrowLeft, 
@@ -153,20 +154,35 @@ export default function AIEmailComposerScreen() {
     setLoading(true);
     
     try {
+      // Send the actual email
+      const emailResult = await sendEmail({
+        to: formData.to,
+        subject: formData.subject,
+        body: formData.body,
+      });
+
+      if (!emailResult.success) {
+        throw new Error(emailResult.error || 'Failed to send email');
+      }
+
+      // Log the email activity
       await supabase
         .from('activities')
         .insert([{
           type: 'email_sent',
-          title: `AI-generated email sent: ${formData.subject}`,
-          description: `To: ${formData.to}`,
+          title: `Email sent: ${formData.subject}`,
+          description: `To: ${formData.to}${emailResult.messageId ? ` (ID: ${emailResult.messageId})` : ''}`,
           user_id: user?.id,
         }]);
 
-      Alert.alert('Success', 'Email sent successfully!');
+      Alert.alert(
+        'Email Sent!', 
+        `Your email has been delivered to ${formData.to}${emailResult.messageId ? `\n\nMessage ID: ${emailResult.messageId}` : ''}`
+      );
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);
-      Alert.alert('Error', 'Failed to send email. Please try again.');
+      Alert.alert('Error', `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

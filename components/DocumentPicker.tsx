@@ -11,6 +11,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
+import { uploadFiles, UploadedFile } from '@/lib/fileUpload';
 import { Upload, File, X, FileText, Image, Video, Music } from 'lucide-react-native';
 
 interface SelectedFile {
@@ -22,23 +23,33 @@ interface SelectedFile {
 
 interface DocumentPickerProps {
   onFilesSelected: (files: SelectedFile[]) => void;
+  onFilesUploaded?: (files: UploadedFile[]) => void;
   maxFiles?: number;
   allowedTypes?: DocumentPicker.DocumentPickerOptions['type'];
   label?: string;
   placeholder?: string;
   storageKey?: string;
+  autoUpload?: boolean;
+  uploadBucket?: string;
+  uploadFolder?: string;
 }
 
 export function DocumentPickerComponent({ 
   onFilesSelected,
+  onFilesUploaded,
   maxFiles = 5,
   allowedTypes = '*/*',
   label = 'Upload Files',
   placeholder = 'No files selected',
-  storageKey
+  storageKey,
+  autoUpload = false,
+  uploadBucket = 'project-files',
+  uploadFolder = 'uploads'
 }: DocumentPickerProps) {
   const { colors } = useTheme();
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
   React.useEffect(() => {
     if (storageKey) {
@@ -108,10 +119,7 @@ export function DocumentPickerComponent({
               mimeType: file.type,
             }));
             
-            const newFiles = [...selectedFiles, ...newSelectedFiles].slice(0, maxFiles);
-            setSelectedFiles(newFiles);
-            onFilesSelected(newFiles);
-            saveFilesToStorage(newFiles);
+            handleNewFiles(newSelectedFiles);
             resolve(null);
           };
           input.click();
@@ -131,10 +139,7 @@ export function DocumentPickerComponent({
             mimeType: asset.mimeType || 'application/octet-stream',
           }));
 
-          const newFiles = [...selectedFiles, ...files].slice(0, maxFiles);
-          setSelectedFiles(newFiles);
-          onFilesSelected(newFiles);
-          saveFilesToStorage(newFiles);
+          handleNewFiles(files);
         }
       }
     } catch (error) {
@@ -143,6 +148,53 @@ export function DocumentPickerComponent({
     }
   };
 
+  const handleNewFiles = async (newFiles: SelectedFile[]) => {
+    const allFiles = [...selectedFiles, ...newFiles].slice(0, maxFiles);
+    setSelectedFiles(allFiles);
+    onFilesSelected(allFiles);
+    saveFilesToStorage(allFiles);
+
+    // Auto-upload if enabled
+    if (autoUpload && onFilesUploaded) {
+      await uploadSelectedFiles(newFiles);
+    }
+  };
+
+  const uploadSelectedFiles = async (filesToUpload: SelectedFile[]) => {
+    if (!onFilesUploaded) return;
+
+    setUploading(true);
+    try {
+      const uploadedFiles = await uploadFiles(
+        filesToUpload.map(file => ({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType,
+          size: file.size,
+        })),
+        {
+          bucket: uploadBucket,
+          folder: uploadFolder,
+          onProgress: (progress) => {
+            // Update progress for individual files
+            setUploadProgress(prev => ({
+              ...prev,
+              [filesToUpload[0].name]: progress.percentage,
+            }));
+          },
+        }
+      );
+
+      onFilesUploaded(uploadedFiles);
+      Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully!`);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      Alert.alert('Upload Error', `Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress({});
+    }
+  };
   const removeFile = (index: number) => {
     const newFiles = selectedFiles.filter((_, i) => i !== index);
     setSelectedFiles(newFiles);
@@ -188,6 +240,9 @@ export function DocumentPickerComponent({
     uploadTextActive: {
       color: colors.primary,
     },
+    uploadingText: {
+      color: colors.warning,
+    },
     filesList: {
       maxHeight: 200,
     },
@@ -231,6 +286,18 @@ export function DocumentPickerComponent({
       fontStyle: 'italic',
       paddingVertical: 8,
     },
+    progressBar: {
+      height: 4,
+      backgroundColor: colors.borderLight,
+      borderRadius: 2,
+      marginTop: 4,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 2,
+    },
   });
 
   return (
@@ -240,22 +307,26 @@ export function DocumentPickerComponent({
       <TouchableOpacity
         style={[
           styles.uploadButton,
-          selectedFiles.length > 0 && styles.uploadButtonActive
+          selectedFiles.length > 0 && styles.uploadButtonActive,
         ]}
         onPress={pickFiles}
+        disabled={uploading}
       >
         <Upload 
-          size={20} 
-          color={selectedFiles.length > 0 ? colors.primary : colors.textSecondary} 
+          size={20}
+          color={uploading ? colors.warning : selectedFiles.length > 0 ? colors.primary : colors.textSecondary}
           style={styles.uploadIcon} 
         />
         <Text style={[
           styles.uploadText,
-          selectedFiles.length > 0 && styles.uploadTextActive
+          selectedFiles.length > 0 && styles.uploadTextActive,
+          uploading && styles.uploadingText,
         ]}>
-          {selectedFiles.length > 0 
-            ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} selected`
-            : 'Tap to select files'
+          {uploading
+            ? 'Uploading files...'
+            : selectedFiles.length > 0 
+              ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} selected`
+              : 'Tap to select files'
           }
         </Text>
       </TouchableOpacity>
@@ -277,10 +348,21 @@ export function DocumentPickerComponent({
                   <Text style={styles.fileSize}>
                     {formatFileSize(item.size)}
                   </Text>
+                  {uploadProgress[item.name] && (
+                    <View style={styles.progressBar}>
+                      <View 
+                        style={[
+                          styles.progressFill, 
+                          { width: `${uploadProgress[item.name]}%` }
+                        ]} 
+                      />
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => removeFile(index)}
+                  disabled={uploading}
                 >
                   <X size={16} color="white" />
                 </TouchableOpacity>
@@ -290,6 +372,18 @@ export function DocumentPickerComponent({
         />
       ) : (
         <Text style={styles.placeholder}>{placeholder}</Text>
+      )}
+      
+      {autoUpload && !uploading && selectedFiles.length > 0 && (
+        <TouchableOpacity
+          style={[styles.uploadButton, { marginTop: 8, backgroundColor: colors.primary }]}
+          onPress={() => uploadSelectedFiles(selectedFiles)}
+        >
+          <Upload size={16} color="white" style={styles.uploadIcon} />
+          <Text style={[styles.uploadText, { color: 'white' }]}>
+            Upload All Files
+          </Text>
+        </TouchableOpacity>
       )}
     </View>
   );
