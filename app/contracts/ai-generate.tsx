@@ -9,6 +9,7 @@ import {
   Alert,
   SafeAreaView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -365,19 +366,6 @@ export default function AIContractGeneratorScreen() {
     },
     inputGroup: {
       marginBottom: 20,
-      zIndex: 1,
-    },
-    typeDropdownGroup: {
-      marginBottom: 20,
-      zIndex: 1002,
-    },
-    clientDropdownGroup: {
-      marginBottom: 20,
-      zIndex: 1001,
-    },
-    projectDropdownGroup: {
-      marginBottom: 20,
-      zIndex: 1000,
     },
     label: {
       fontSize: 14,
@@ -418,10 +406,6 @@ export default function AIContractGeneratorScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
-    dropdownContainer: {
-      position: 'relative',
-      zIndex: 1000,
-    },
     dropdownButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -441,23 +425,20 @@ export default function AIContractGeneratorScreen() {
     dropdownPlaceholder: {
       color: colors.textMuted,
     },
-    dropdownList: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
+    dropdownModal: {
+      flex: 1,
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    dropdownListContainer: {
+      maxHeight: '60%',
+      marginHorizontal: 20,
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
       borderRadius: 12,
-      marginTop: 4,
-      maxHeight: 200,
-      zIndex: 2000,
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
+      overflow: 'hidden',
+    },
+    dropdownList: {
+      flex: 1,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -516,6 +497,40 @@ export default function AIContractGeneratorScreen() {
       color: colors.primary,
     },
   });
+
+  const renderDropdownModal = (items: any[], selectedValue: string, onSelect: (value: string) => void, visible: boolean, onClose: () => void) => {
+    return (
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.dropdownModal}
+          activeOpacity={1}
+          onPressOut={onClose}
+        >
+          <View style={styles.dropdownListContainer}>
+            <ScrollView style={styles.dropdownList}>
+              {items.map((item) => (
+                <TouchableOpacity
+                  key={item.id || item}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onSelect(item.id || item);
+                    onClose();
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{item.name || item}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -588,16 +603,14 @@ export default function AIContractGeneratorScreen() {
             </View>
           </View>
 
-          <View style={[styles.typeDropdownGroup, styles.dropdownContainer]}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>
               Contract Type <Text style={styles.required}>*</Text>
             </Text>
             <TouchableOpacity
               style={styles.dropdownButton}
               onPress={() => {
-                setShowTypeDropdown(!showTypeDropdown);
-                setShowClientDropdown(false);
-                setShowProjectDropdown(false);
+                setShowTypeDropdown(true);
               }}
             >
               <Text style={[
@@ -608,37 +621,16 @@ export default function AIContractGeneratorScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
-            {showTypeDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {contractTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, type }));
-                        setShowTypeDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{type}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
-          <View style={[styles.clientDropdownGroup, styles.dropdownContainer]}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
             <TouchableOpacity
               style={styles.dropdownButton}
               onPress={() => {
-                setShowClientDropdown(!showClientDropdown);
-                setShowTypeDropdown(false);
-                setShowProjectDropdown(false);
+                setShowClientDropdown(true);
               }}
             >
               <Text style={[
@@ -649,35 +641,14 @@ export default function AIContractGeneratorScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
-            {showClientDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {clients.map((client) => (
-                    <TouchableOpacity
-                      key={client.id}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, client_id: client.id }));
-                        setShowClientDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{client.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
-          <View style={[styles.projectDropdownGroup, styles.dropdownContainer]}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>Project (Optional)</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
               onPress={() => {
-                setShowProjectDropdown(!showProjectDropdown);
-                setShowTypeDropdown(false);
-                setShowClientDropdown(false);
+                setShowProjectDropdown(true);
               }}
             >
               <Text style={[
@@ -688,34 +659,6 @@ export default function AIContractGeneratorScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
-            {showProjectDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, project_id: '' }));
-                      setShowProjectDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>No project</Text>
-                  </TouchableOpacity>
-                  {projects.map((project) => (
-                    <TouchableOpacity
-                      key={project.id}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, project_id: project.id }));
-                        setShowProjectDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{project.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -774,6 +717,31 @@ export default function AIContractGeneratorScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Dropdown Modals */}
+      {renderDropdownModal(
+        contractTypes,
+        formData.type,
+        (type) => setFormData(prev => ({ ...prev, type })),
+        showTypeDropdown,
+        () => setShowTypeDropdown(false)
+      )}
+
+      {renderDropdownModal(
+        clients,
+        formData.client_id,
+        (client_id) => setFormData(prev => ({ ...prev, client_id })),
+        showClientDropdown,
+        () => setShowClientDropdown(false)
+      )}
+
+      {renderDropdownModal(
+        [{ id: '', name: 'No project' }, ...projects],
+        formData.project_id,
+        (project_id) => setFormData(prev => ({ ...prev, project_id })),
+        showProjectDropdown,
+        () => setShowProjectDropdown(false)
+      )}
     </SafeAreaView>
   );
 }

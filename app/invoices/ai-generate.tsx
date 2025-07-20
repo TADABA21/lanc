@@ -9,7 +9,7 @@ import {
   Alert,
   SafeAreaView,
   ActivityIndicator,
-  Platform,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -52,6 +52,7 @@ export default function AIInvoiceGeneratorScreen() {
     due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     notes: '',
     terms: '',
+    summary: '',
   });
   
   const [items, setItems] = useState<InvoiceItem[]>([
@@ -64,6 +65,7 @@ export default function AIInvoiceGeneratorScreen() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [parseMode, setParseMode] = useState<'summary' | 'manual'>('manual');
 
   useEffect(() => {
     fetchClients();
@@ -173,7 +175,31 @@ export default function AIInvoiceGeneratorScreen() {
     setAiGenerating(true);
     
     try {
-      const itemsContext = items
+      let generatedItems = items;
+      
+      if (parseMode === 'summary' && formData.summary.trim()) {
+        try {
+          const parseMessages = invoicePrompts.parseSummary(formData.summary);
+          const parseResponse = await generateWithGroq(parseMessages);
+          
+          // Try to parse the response as JSON
+          const parsedItems = JSON.parse(parseResponse);
+          if (Array.isArray(parsedItems)) {
+            generatedItems = parsedItems.map(item => ({
+              description: item.description || '',
+              quantity: item.quantity || 1,
+              rate: item.rate || 0,
+              amount: (item.quantity || 1) * (item.rate || 0)
+            }));
+            setItems(generatedItems);
+          }
+        } catch (e) {
+          console.error('Failed to parse AI response as JSON', e);
+          Alert.alert('Notice', 'AI had trouble parsing the summary. Please review the generated items.');
+        }
+      }
+
+      const itemsContext = generatedItems
         .filter(item => item.description.trim())
         .map(item => ({
           description: item.description,
@@ -284,6 +310,40 @@ export default function AIInvoiceGeneratorScreen() {
   const selectedClient = clients.find(c => c.id === formData.client_id);
   const selectedProject = projects.find(p => p.id === formData.project_id);
 
+  const renderDropdownModal = (items: any[], selectedValue: string, onSelect: (value: string) => void, visible: boolean, onClose: () => void) => {
+    return (
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.dropdownModal}
+          activeOpacity={1}
+          onPressOut={onClose}
+        >
+          <View style={styles.dropdownListContainer}>
+            <ScrollView style={styles.dropdownList}>
+              {items.map((item) => (
+                <TouchableOpacity
+                  key={item.id || item}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onSelect(item.id || item);
+                    onClose();
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{item.name || item}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -345,6 +405,70 @@ export default function AIInvoiceGeneratorScreen() {
     },
     scrollContent: {
       padding: 24,
+    },
+    summaryContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 24,
+    },
+    summaryHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    summaryTitle: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: colors.text,
+    },
+    parseToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    parseToggleButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    parseToggleButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    parseToggleText: {
+      fontSize: 12,
+      fontFamily: 'Inter-Medium',
+    },
+    parseToggleTextActive: {
+      color: 'white',
+    },
+    parseToggleTextInactive: {
+      color: colors.textSecondary,
+    },
+    summaryInput: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
+    },
+    summaryHint: {
+      fontSize: 12,
+      fontFamily: 'Inter-Regular',
+      color: colors.textMuted,
+      marginTop: 8,
+      lineHeight: 16,
     },
     aiSection: {
       backgroundColor: colors.surface,
@@ -409,15 +533,6 @@ export default function AIInvoiceGeneratorScreen() {
     },
     inputGroup: {
       marginBottom: 20,
-      zIndex: 1,
-    },
-    clientDropdownGroup: {
-      marginBottom: 20,
-      zIndex: 1000,
-    },
-    projectDropdownGroup: {
-      marginBottom: 20,
-      zIndex: 999,
     },
     label: {
       fontSize: 14,
@@ -458,10 +573,6 @@ export default function AIInvoiceGeneratorScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
-    dropdownContainer: {
-      position: 'relative',
-      zIndex: 1000,
-    },
     dropdownButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -481,23 +592,20 @@ export default function AIInvoiceGeneratorScreen() {
     dropdownPlaceholder: {
       color: colors.textMuted,
     },
-    dropdownList: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
+    dropdownModal: {
+      flex: 1,
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    dropdownListContainer: {
+      maxHeight: '60%',
+      marginHorizontal: 20,
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
       borderRadius: 12,
-      marginTop: 4,
-      maxHeight: 200,
-      zIndex: 2000,
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
+      overflow: 'hidden',
+    },
+    dropdownList: {
+      flex: 1,
     },
     dropdownItem: {
       paddingHorizontal: 16,
@@ -707,6 +815,63 @@ export default function AIInvoiceGeneratorScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+        {/* Summary Section */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Work Summary</Text>
+            <View style={styles.parseToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.parseToggleButton,
+                  parseMode === 'manual' && styles.parseToggleButtonActive
+                ]}
+                onPress={() => setParseMode('manual')}
+              >
+                <Text style={[
+                  styles.parseToggleText,
+                  parseMode === 'manual' ? styles.parseToggleTextActive : styles.parseToggleTextInactive
+                ]}>
+                  Manual Entry
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.parseToggleButton,
+                  parseMode === 'summary' && styles.parseToggleButtonActive
+                ]}
+                onPress={() => setParseMode('summary')}
+              >
+                <Text style={[
+                  styles.parseToggleText,
+                  parseMode === 'summary' ? styles.parseToggleTextActive : styles.parseToggleTextInactive
+                ]}>
+                  Parse Summary
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          {parseMode === 'summary' ? (
+            <>
+              <TextInput
+                style={styles.summaryInput}
+                value={formData.summary}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, summary: text }))}
+                placeholder="Paste or type a summary of the work including items and prices..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+              />
+              <Text style={styles.summaryHint}>
+                Example: "Built a website homepage - $500, Added contact form - $300, SEO optimization - $200"
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.summaryHint}>
+              Switch to "Parse Summary" mode to automatically extract line items from a work description.
+            </Text>
+          )}
+        </View>
+
         {/* AI Generation Section */}
         <View style={styles.aiSection}>
           <View style={styles.aiHeader}>
@@ -752,16 +917,13 @@ export default function AIInvoiceGeneratorScreen() {
             </View>
           </View>
 
-          <View style={[styles.clientDropdownGroup, styles.dropdownContainer]}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>
               Client <Text style={styles.required}>*</Text>
             </Text>
             <TouchableOpacity
               style={styles.dropdownButton}
-              onPress={() => {
-                setShowClientDropdown(!showClientDropdown);
-                setShowProjectDropdown(false);
-              }}
+              onPress={() => setShowClientDropdown(true)}
             >
               <Text style={[
                 styles.dropdownText,
@@ -771,35 +933,13 @@ export default function AIInvoiceGeneratorScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
-            {showClientDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {clients.map((client) => (
-                    <TouchableOpacity
-                      key={client.id}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, client_id: client.id }));
-                        setShowClientDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{client.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
-          <View style={[styles.projectDropdownGroup, styles.dropdownContainer]}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>Project (Optional)</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
-              onPress={() => {
-                setShowProjectDropdown(!showProjectDropdown);
-                setShowClientDropdown(false);
-              }}
+              onPress={() => setShowProjectDropdown(true)}
             >
               <Text style={[
                 styles.dropdownText,
@@ -809,34 +949,6 @@ export default function AIInvoiceGeneratorScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
-            {showProjectDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, project_id: '' }));
-                      setShowProjectDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>No project</Text>
-                  </TouchableOpacity>
-                  {projects.map((project) => (
-                    <TouchableOpacity
-                      key={project.id}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, project_id: project.id }));
-                        setShowProjectDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{project.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -999,6 +1111,23 @@ export default function AIInvoiceGeneratorScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Dropdown Modals */}
+      {renderDropdownModal(
+        clients,
+        formData.client_id,
+        (client_id) => setFormData(prev => ({ ...prev, client_id })),
+        showClientDropdown,
+        () => setShowClientDropdown(false)
+      )}
+
+      {renderDropdownModal(
+        [{ id: '', name: 'No project' }, ...projects],
+        formData.project_id,
+        (project_id) => setFormData(prev => ({ ...prev, project_id })),
+        showProjectDropdown,
+        () => setShowProjectDropdown(false)
+      )}
     </SafeAreaView>
   );
 }

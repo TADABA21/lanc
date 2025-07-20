@@ -219,7 +219,6 @@ export function DatePicker({
                 onChangeText={handleWebDateChange}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={colors.textMuted}
-                type="date"
               />
             ) : (
               <View style={{ padding: 20 }}>
