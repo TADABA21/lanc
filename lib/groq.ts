@@ -1,10 +1,91 @@
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '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';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
+// lib/groq.ts
 export interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
+
+export const invoicePrompts = {
+  generateInvoice: (clientName: string, projectName: string, items: any[]): GroqMessage[] => [
+    {
+      role: 'system',
+      content: `You are an expert at generating professional invoices. 
+      Create invoice content including notes and terms based on the provided information.
+      The notes should include a thank you message and any relevant details.
+      The terms should include payment conditions and other important terms.
+      Format the response with clear sections for Notes and Terms.`
+    },
+    {
+      role: 'user',
+      content: `Client: ${clientName}
+Project: ${projectName}
+Items: ${JSON.stringify(items)}`
+    }
+  ],
+  
+  parseSummary: (summary: string): GroqMessage[] => [
+    {
+      role: 'system',
+      content: `You are an expert at parsing work summaries and extracting line items for invoices. 
+      Extract the items, quantities, and prices from the following summary and return them as a JSON array. 
+      Each item should have description, quantity (default to 1 if not specified), and rate (price). 
+      Return ONLY valid JSON. Example output: 
+      [{"description": "Website design", "quantity": 1, "rate": 500}, 
+      {"description": "SEO optimization", "quantity": 1, "rate": 200}]`
+    },
+    {
+      role: 'user',
+      content: summary
+    }
+  ]
+};
+
+export const contractPrompts = {
+  generateContract: (type: string, clientName: string, projectName: string, scope: string): GroqMessage[] => [
+    {
+      role: 'system',
+      content: 'You are a legal contract specialist. Generate professional, legally sound contract content based on the provided information. Include all necessary clauses, terms, and conditions appropriate for the contract type.',
+    },
+    {
+      role: 'user',
+      content: `Generate a ${type} contract for:
+Client: ${clientName}
+Project: ${projectName}
+Scope: ${scope}
+
+Please provide a complete contract with:
+1. Parties section
+2. Scope of work
+3. Payment terms
+4. Timeline and deliverables
+5. Intellectual property rights
+6. Termination clauses
+7. Liability limitations
+8. Signature sections`,
+    },
+  ],
+};
+
+export const emailPrompts = {
+  generateEmail: (purpose: string, clientName: string, context: string): GroqMessage[] => [
+    {
+      role: 'system',
+      content: 'You are a professional business communication specialist. Generate professional, clear, and engaging email content based on the provided context and purpose.',
+    },
+    {
+      role: 'user',
+      content: `Generate a professional email for:
+Purpose: ${purpose}
+Client: ${clientName}
+Context: ${context}
+
+Please provide:
+1. Professional subject line
+2. Well-structured email body
+3. Appropriate tone and language
+4. Clear call-to-action if needed`,
+    },
+  ],
+};
 
 export interface GroqResponse {
   choices: Array<{
@@ -15,6 +96,9 @@ export interface GroqResponse {
 }
 
 export async function generateWithGroq(messages: GroqMessage[]): Promise<string> {
+  const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || 'your-api-key-here';
+  const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
   try {
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -41,86 +125,3 @@ export async function generateWithGroq(messages: GroqMessage[]): Promise<string>
     throw new Error('Failed to generate content with AI');
   }
 }
-
-export const invoicePrompts = {
-  generateInvoice: (clientName: string, projectName: string, items: any[]) => [
-    {
-      role: 'system' as const,
-      content: 'You are a professional business invoice specialist. Generate comprehensive, professional invoice content that includes detailed terms and conditions, clear payment instructions, and professional notes. Focus on creating content that maintains good client relationships while protecting business interests.',
-    },
-    {
-      role: 'user' as const,
-      content: `Generate professional invoice content for:
-Client: ${clientName}
-Project: ${projectName}
-Line Items: ${items.map(item => `${item.description} (Qty: ${item.quantity}, Rate: $${item.rate}, Amount: $${item.amount})`).join('; ')}
-
-Please provide two distinct sections:
-
-**NOTES SECTION:**
-- Professional thank you message
-- Brief project summary or description
-- Any relevant project details or deliverables completed
-- Appreciation for the business relationship
-- Contact information for questions
-
-**TERMS & CONDITIONS SECTION:**
-- Clear payment due date (30 days standard)
-- Accepted payment methods
-- Late payment fees and policies
-- Dispute resolution process
-- Professional business terms
-- Legal protections for the service provider
-
-Make both sections professional, clear, and client-friendly while protecting business interests. Use a warm but professional tone.`,
-    },
-  ],
-};
-
-export const contractPrompts = {
-  generateContract: (type: string, clientName: string, projectName: string, scope: string) => [
-    {
-      role: 'system' as const,
-      content: 'You are a legal contract specialist. Generate professional, legally sound contract content based on the provided information. Include all necessary clauses, terms, and conditions appropriate for the contract type.',
-    },
-    {
-      role: 'user' as const,
-      content: `Generate a ${type} contract for:
-Client: ${clientName}
-Project: ${projectName}
-Scope: ${scope}
-
-Please provide a complete contract with:
-1. Parties section
-2. Scope of work
-3. Payment terms
-4. Timeline and deliverables
-5. Intellectual property rights
-6. Termination clauses
-7. Liability limitations
-8. Signature sections`,
-    },
-  ],
-};
-
-export const emailPrompts = {
-  generateEmail: (purpose: string, clientName: string, context: string) => [
-    {
-      role: 'system' as const,
-      content: 'You are a professional business communication specialist. Generate professional, clear, and engaging email content based on the provided context and purpose.',
-    },
-    {
-      role: 'user' as const,
-      content: `Generate a professional email for:
-Purpose: ${purpose}
-Client: ${clientName}
-Context: ${context}
-
-Please provide:
-1. Professional subject line
-2. Well-structured email body
-3. Appropriate tone and language
-4. Clear call-to-action if needed`,
-    },
-  ],
-};

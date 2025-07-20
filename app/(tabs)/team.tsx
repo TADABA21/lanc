@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Platform,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { Employee } from '@/types/database';
-import { User, Search, Plus, Mail, Phone, CreditCard as Edit, Trash2 } from 'lucide-react-native';
+import { User, Search, Plus, Mail, Phone, CreditCard as Edit, Trash2, X } from 'lucide-react-native';
 import { formatCurrency, getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,6 +34,8 @@ export default function TeamScreen() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'on_leave' | 'terminated'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<{id: string, name: string} | null>(null);
 
   const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
 
@@ -72,63 +76,60 @@ export default function TeamScreen() {
     router.push(`/team/view/${employeeId}`);
   };
 
-  const handleDeleteTeamMember = async (employeeId: string, employeeName: string) => {
-    Alert.alert(
-      'Delete Team Member',
-      `Are you sure you want to delete "${employeeName}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Remove from project memberships first
-              const { error: projectMembersError } = await supabase
-                .from('project_members')
-                .delete()
-                .eq('team_member_id', employeeId);
-              
-              if (projectMembersError) {
-                console.warn('Error removing project memberships:', projectMembersError);
-              }
-              
-              // Update project files to remove uploader reference
-              await supabase
-                .from('project_files')
-                .update({ uploaded_by: null })
-                .eq('uploaded_by', employeeId);
+  const confirmDeleteTeamMember = (employeeId: string, employeeName: string) => {
+    setEmployeeToDelete({ id: employeeId, name: employeeName });
+    setDeleteModalVisible(true);
+  };
 
-              // Now delete the team member
-              const { error: teamMemberError } = await supabase
-                .from('team_members')
-                .delete()
-                .eq('id', employeeId)
-                .eq('user_id', user?.id);
+  const handleDeleteTeamMember = async () => {
+    if (!user || !employeeToDelete) return;
 
-              if (teamMemberError) throw teamMemberError;
+    try {
+      // Remove from project memberships first
+      const { error: projectMembersError } = await supabase
+        .from('project_members')
+        .delete()
+        .eq('team_member_id', employeeToDelete.id);
+      
+      if (projectMembersError) {
+        console.warn('Error removing project memberships:', projectMembersError);
+      }
+      
+      // Update project files to remove uploader reference
+      await supabase
+        .from('project_files')
+        .update({ uploaded_by: null })
+        .eq('uploaded_by', employeeToDelete.id);
 
-              // Create activity log
-              await supabase
-                .from('activities')
-                .insert([{
-                  type: 'team_member_deleted',
-                  title: `Team member deleted: ${employeeName}`,
-                  description: 'Team member was permanently deleted',
-                  entity_type: 'team_member',
-                  user_id: user?.id,
-                }]);
+      // Now delete the team member
+      const { error: teamMemberError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', employeeToDelete.id)
+        .eq('user_id', user.id);
 
-              await fetchEmployees();
-              Alert.alert('Success', 'Team member deleted successfully');
-            } catch (error) {
-              console.error('Error deleting team member:', error);
-              Alert.alert('Error', 'Failed to delete team member');
-            }
-          },
-        },
-      ]
-    );
+      if (teamMemberError) throw teamMemberError;
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'team_member_deleted',
+          title: `Team member deleted: ${employeeToDelete.name}`,
+          description: 'Team member was permanently deleted',
+          entity_type: 'team_member',
+          user_id: user.id,
+        }]);
+
+      await fetchEmployees();
+      Alert.alert('Success', 'Team member deleted successfully');
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      Alert.alert('Error', 'Failed to delete team member');
+    } finally {
+      setDeleteModalVisible(false);
+      setEmployeeToDelete(null);
+    }
   };
 
   useEffect(() => {
@@ -143,7 +144,6 @@ export default function TeamScreen() {
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate bottom padding to account for tab bar
   const getBottomPadding = () => {
     if (Platform.OS === 'android') {
       const androidBottomPadding = Math.max(insets.bottom + 8, 24);
@@ -187,7 +187,7 @@ export default function TeamScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => handleDeleteTeamMember(employee.id, employee.name)}
+            onPress={() => confirmDeleteTeamMember(employee.id, employee.name)}
           >
             <Trash2 size={16} color={colors.error} />
           </TouchableOpacity>
@@ -518,11 +518,71 @@ export default function TeamScreen() {
       fontFamily: 'Inter-SemiBold',
       color: 'white',
     },
+    // Modal styles
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      width: '90%',
+      maxWidth: 400,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontFamily: 'Inter-SemiBold',
+      color: colors.text,
+    },
+    modalCloseButton: {
+      padding: 4,
+    },
+    modalMessage: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.textSecondary,
+      marginBottom: 24,
+      lineHeight: 24,
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 12,
+    },
+    modalButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    modalCancelButton: {
+      backgroundColor: colors.borderLight,
+    },
+    modalDeleteButton: {
+      backgroundColor: colors.error,
+    },
+    modalButtonText: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+    },
+    modalCancelButtonText: {
+      color: colors.text,
+    },
+    modalDeleteButtonText: {
+      color: 'white',
+    },
   });
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Always show header on desktop/web when sidebar is visible */}
       {shouldShowSidebar && (
         <View style={styles.header}>
           <Text style={styles.title}>Team</Text>
@@ -532,7 +592,6 @@ export default function TeamScreen() {
         </View>
       )}
 
-      {/* Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{employees.length}</Text>
@@ -614,6 +673,51 @@ export default function TeamScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalContainer}
+          onPress={() => setDeleteModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Team Member</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalMessage}>
+              Are you sure you want to delete "{employeeToDelete?.name}"? This action cannot be undone.
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonText, styles.modalCancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalDeleteButton]}
+                onPress={handleDeleteTeamMember}
+              >
+                <Text style={[styles.modalButtonText, styles.modalDeleteButtonText]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

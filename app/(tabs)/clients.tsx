@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +36,8 @@ export default function ClientsScreen() {
   const [selectedClientProjects, setSelectedClientProjects] = useState<Project[]>([]);
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<{id: string, name: string} | null>(null);
 
   const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
 
@@ -96,80 +99,77 @@ export default function ClientsScreen() {
     router.push(`/clients/view/${clientId}`);
   };
 
-  const handleDeleteClient = async (clientId: string, clientName: string) => {
-    Alert.alert(
-      'Delete Client',
-      `Are you sure you want to delete "${clientName}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Update related records to remove client reference instead of deleting
-              const updatePromises = [
-                // Update projects to remove client reference
-                supabase
-                  .from('projects')
-                  .update({ client_id: null })
-                  .eq('client_id', clientId)
-                  .eq('user_id', user?.id),
-                
-                // Update invoices to remove client reference
-                supabase
-                  .from('invoices')
-                  .update({ client_id: null })
-                  .eq('client_id', clientId)
-                  .eq('user_id', user?.id),
-                
-                // Update contracts to remove client reference
-                supabase
-                  .from('contracts')
-                  .update({ client_id: null })
-                  .eq('client_id', clientId)
-                  .eq('user_id', user?.id),
-                
-                // Update testimonials to remove client reference
-                supabase
-                  .from('testimonials')
-                  .update({ client_id: null })
-                  .eq('client_id', clientId)
-                  .eq('user_id', user?.id),
-              ];
-              
-              await Promise.all(updatePromises);
-              
-              // Now delete the client
-              const { error: clientError } = await supabase
-                .from('clients')
-                .delete()
-                .eq('id', clientId)
-                .eq('user_id', user?.id);
+  const confirmDeleteClient = (clientId: string, clientName: string) => {
+    setClientToDelete({ id: clientId, name: clientName });
+    setDeleteModalVisible(true);
+  };
 
-              if (clientError) throw clientError;
+  const handleDeleteClient = async () => {
+    if (!user || !clientToDelete) return;
 
-              // Create activity log
-              await supabase
-                .from('activities')
-                .insert([{
-                  type: 'client_deleted',
-                  title: `Client deleted: ${clientName}`,
-                  description: 'Client was permanently deleted',
-                  entity_type: 'client',
-                  user_id: user?.id,
-                }]);
+    try {
+      // Update related records to remove client reference instead of deleting
+      const updatePromises = [
+        // Update projects to remove client reference
+        supabase
+          .from('projects')
+          .update({ client_id: null })
+          .eq('client_id', clientToDelete.id)
+          .eq('user_id', user.id),
+        
+        // Update invoices to remove client reference
+        supabase
+          .from('invoices')
+          .update({ client_id: null })
+          .eq('client_id', clientToDelete.id)
+          .eq('user_id', user.id),
+        
+        // Update contracts to remove client reference
+        supabase
+          .from('contracts')
+          .update({ client_id: null })
+          .eq('client_id', clientToDelete.id)
+          .eq('user_id', user.id),
+        
+        // Update testimonials to remove client reference
+        supabase
+          .from('testimonials')
+          .update({ client_id: null })
+          .eq('client_id', clientToDelete.id)
+          .eq('user_id', user.id),
+      ];
+      
+      await Promise.all(updatePromises);
+      
+      // Now delete the client
+      const { error: clientError } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientToDelete.id)
+        .eq('user_id', user.id);
 
-              await fetchClients();
-              Alert.alert('Success', 'Client deleted successfully');
-            } catch (error) {
-              console.error('Error deleting client:', error);
-              Alert.alert('Error', 'Failed to delete client');
-            }
-          },
-        },
-      ]
-    );
+      if (clientError) throw clientError;
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'client_deleted',
+          title: `Client deleted: ${clientToDelete.name}`,
+          description: 'Client was permanently deleted',
+          entity_type: 'client',
+          user_id: user.id,
+        }]);
+
+      await fetchClients();
+      Alert.alert('Success', 'Client deleted successfully');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      Alert.alert('Error', 'Failed to delete client');
+    } finally {
+      setDeleteModalVisible(false);
+      setClientToDelete(null);
+    }
   };
 
   const handleViewProjects = (clientId: string, clientName: string) => {
@@ -191,7 +191,6 @@ export default function ClientsScreen() {
     client.company?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calculate bottom padding to account for tab bar
   const getBottomPadding = () => {
     if (Platform.OS === 'android') {
       const androidBottomPadding = Math.max(insets.bottom + 8, 24);
@@ -232,7 +231,7 @@ export default function ClientsScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => handleDeleteClient(client.id, client.name)}
+            onPress={() => confirmDeleteClient(client.id, client.name)}
           >
             <Trash2 size={16} color={colors.error} />
           </TouchableOpacity>
@@ -602,11 +601,71 @@ export default function ClientsScreen() {
       color: colors.textSecondary,
       marginTop: 12,
     },
+    // Delete Modal styles
+    deleteModalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    deleteModalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      width: '90%',
+      maxWidth: 400,
+    },
+    deleteModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    deleteModalTitle: {
+      fontSize: 18,
+      fontFamily: 'Inter-SemiBold',
+      color: colors.text,
+    },
+    deleteModalCloseButton: {
+      padding: 4,
+    },
+    deleteModalMessage: {
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+      color: colors.textSecondary,
+      marginBottom: 24,
+      lineHeight: 24,
+    },
+    deleteModalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 12,
+    },
+    deleteModalButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    deleteModalCancelButton: {
+      backgroundColor: colors.borderLight,
+    },
+    deleteModalDeleteButton: {
+      backgroundColor: colors.error,
+    },
+    deleteModalButtonText: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+    },
+    deleteModalCancelButtonText: {
+      color: colors.text,
+    },
+    deleteModalDeleteButtonText: {
+      color: 'white',
+    },
   });
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Always show header on desktop/web when sidebar is visible */}
       {shouldShowSidebar && (
         <View style={styles.header}>
           <Text style={styles.title}>Clients</Text>
@@ -696,6 +755,51 @@ export default function ClientsScreen() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.deleteModalContainer}
+          onPress={() => setDeleteModalVisible(false)}
+        >
+          <Pressable style={styles.deleteModalContent}>
+            <View style={styles.deleteModalHeader}>
+              <Text style={styles.deleteModalTitle}>Delete Client</Text>
+              <TouchableOpacity 
+                style={styles.deleteModalCloseButton}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete "{clientToDelete?.name}"? This action cannot be undone.
+            </Text>
+            
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity 
+                style={[styles.deleteModalButton, styles.deleteModalCancelButton]}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={[styles.deleteModalButtonText, styles.deleteModalCancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.deleteModalButton, styles.deleteModalDeleteButton]}
+                onPress={handleDeleteClient}
+              >
+                <Text style={[styles.deleteModalButtonText, styles.deleteModalDeleteButtonText]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
