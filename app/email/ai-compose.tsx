@@ -161,12 +161,17 @@ export default function AIEmailComposerScreen() {
     setLoading(true);
     
     try {
+      // Ensure we have a valid sender name and email
+      const senderEmail = user?.email || 'noreply@resend.dev';
+      const senderName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Business Manager';
+      const fromAddress = `${senderName} <${senderEmail}>`;
+      
       // Send the actual email
       const emailResult = await sendEmail({
         to: formData.to,
         subject: formData.subject,
         body: formData.body,
-        from: `${user?.email} <noreply@resend.dev>`, // Use user's email as display name
+        from: fromAddress,
       });
 
       if (!emailResult.success) {
@@ -202,12 +207,16 @@ export default function AIEmailComposerScreen() {
       // Provide helpful error messages
       let errorMessage = 'Failed to send email. Please try again.';
       if (error instanceof Error) {
-        if (error.message.includes('API key')) {
+        if (error.message.includes('API key') || error.message.includes('Invalid API key')) {
           errorMessage = 'Email service configuration error. Please contact support.';
-        } else if (error.message.includes('rate limit')) {
+        } else if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
           errorMessage = 'Too many emails sent. Please wait a moment and try again.';
-        } else if (error.message.includes('invalid')) {
+        } else if (error.message.includes('invalid') || error.message.includes('Invalid')) {
           errorMessage = 'Invalid email address or content. Please check and try again.';
+        } else if (error.message.includes('Network error')) {
+          errorMessage = 'Network connection error. Please check your internet connection and try again.';
+        } else if (error.message.includes('temporarily unavailable')) {
+          errorMessage = 'Email service is temporarily unavailable. Please try again in a few minutes.';
         } else {
           errorMessage = `Send failed: ${error.message}`;
         }

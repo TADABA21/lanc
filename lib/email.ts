@@ -58,16 +58,41 @@ export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
     console.log('To:', emailData.to);
     console.log('Subject:', emailData.subject);
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    let responseData: any;
+    
+    try {
+      response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (fetchError) {
+      console.error('❌ Network error when calling Resend API:', fetchError);
+      return {
+        success: false,
+        error: 'Network error: Unable to connect to email service. Please check your internet connection.',
+        details: fetchError,
+      };
+    }
 
-    const responseData = await response.json();
+    // Try to parse response as JSON, handle cases where it might not be JSON
+    try {
+      responseData = await response.json();
+    } catch (jsonError) {
+      console.error('❌ Failed to parse response as JSON:', jsonError);
+      const responseText = await response.text().catch(() => 'Unable to read response');
+      console.error('Raw response:', responseText);
+      
+      return {
+        success: false,
+        error: `Invalid response from email service. Status: ${response.status}`,
+        details: { status: response.status, responseText },
+      };
+    }
 
     if (!response.ok) {
       console.error('❌ Resend API Error:', responseData);
@@ -78,6 +103,12 @@ export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
         errorMessage = responseData.message;
       } else if (responseData.error) {
         errorMessage = responseData.error;
+      } else if (response.status === 401) {
+        errorMessage = 'Invalid API key. Please check your Resend configuration.';
+      } else if (response.status === 429) {
+        errorMessage = 'Rate limit exceeded. Please try again later.';
+      } else if (response.status >= 500) {
+        errorMessage = 'Email service temporarily unavailable. Please try again later.';
       }
       
       return {
@@ -99,7 +130,8 @@ export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
     console.error('❌ Error sending email:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Unknown error occurred while sending email',
+      details: error,
     };
   }
 }
