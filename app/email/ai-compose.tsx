@@ -22,6 +22,7 @@ import {
   Send, 
   Save, 
   X, 
+  Mail, 
   ChevronDown,
   Sparkles,
   Paperclip,
@@ -138,8 +139,7 @@ export default function AIEmailComposerScreen() {
       Alert.alert('Success', 'AI has generated a professional email!');
     } catch (error) {
       console.error('Error generating with AI:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate email with AI';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', 'Failed to generate email with AI. Please try again.');
     } finally {
       setAiGenerating(false);
     }
@@ -151,21 +151,15 @@ export default function AIEmailComposerScreen() {
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.to)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
     setLoading(true);
     
     try {
+      // Send the actual email
       const emailResult = await sendEmail({
         to: formData.to,
         subject: formData.subject,
         body: formData.body,
-      }, user);
+      });
 
       if (!emailResult.success) {
         throw new Error(emailResult.error || 'Failed to send email');
@@ -188,8 +182,7 @@ export default function AIEmailComposerScreen() {
       router.back();
     } catch (error) {
       console.error('Error sending email:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send email';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -209,8 +202,7 @@ export default function AIEmailComposerScreen() {
       Alert.alert('Success', 'Draft saved successfully!');
     } catch (error) {
       console.error('Error saving draft:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save draft';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', 'Failed to save draft.');
     }
   };
 
@@ -485,9 +477,8 @@ export default function AIEmailComposerScreen() {
     },
   });
 
-    return (
+  return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -509,7 +500,6 @@ export default function AIEmailComposerScreen() {
         </View>
       </View>
 
-      {/* Content */}
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         {/* AI Generation Section */}
         <View style={styles.aiSection}>
