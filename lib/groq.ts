@@ -1,4 +1,3 @@
-// lib/groq.ts
 export interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -87,16 +86,14 @@ Please provide:
   ],
 };
 
-export interface GroqResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
-
 export async function generateWithGroq(messages: GroqMessage[]): Promise<string> {
-  const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || 'your-api-key-here';
+  // IMPORTANT: Make sure you have this environment variable set in your .env file
+  const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+  
+  if (!GROQ_API_KEY) {
+    throw new Error('Groq API key is missing. Please set EXPO_PUBLIC_GROQ_API_KEY in your environment variables.');
+  }
+
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
   try {
@@ -107,7 +104,7 @@ export async function generateWithGroq(messages: GroqMessage[]): Promise<string>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'llama3-8b-8192', // or 'mixtral-8x7b-32768' for more complex tasks
         messages,
         temperature: 0.7,
         max_tokens: 2048,
@@ -115,10 +112,12 @@ export async function generateWithGroq(messages: GroqMessage[]): Promise<string>
     });
 
     if (!response.ok) {
-      throw new Error(`Groq API error: ${response.statusText}`);
+      const errorData = await response.json();
+      console.error('Groq API error details:', errorData);
+      throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
     }
 
-    const data: GroqResponse = await response.json();
+    const data = await response.json();
     return data.choices[0]?.message?.content || '';
   } catch (error) {
     console.error('Error calling Groq API:', error);
