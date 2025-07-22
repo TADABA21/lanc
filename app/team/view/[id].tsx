@@ -474,10 +474,17 @@ export default function TeamMemberDetailScreen() {
     }
 
     try {
-      // Always use AI email composer
-      router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
+      // Always use AI email composer with pre-filled data
+      const params = new URLSearchParams({
+        to: employee.email,
+        employeeName: employee.name,
+        ...(employee.role && { employeeRole: employee.role }),
+        ...(employee.department && { employeeDepartment: employee.department }),
+      });
+      router.push(`/email/ai-compose?${params.toString()}`);
     } catch (error) {
       console.error('Error opening email:', error);
+      // Fallback to basic compose
       router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
     }
   };

@@ -391,10 +391,16 @@ export default function ClientDetailScreen() {
     }
 
     try {
-      // Always use AI email composer
-      router.push(`/email/ai-compose?to=${client.email}&clientName=${client.name}`);
+      // Always use AI email composer with pre-filled data
+      const params = new URLSearchParams({
+        to: client.email,
+        clientName: client.name,
+        ...(client.company && { clientCompany: client.company }),
+      });
+      router.push(`/email/ai-compose?${params.toString()}`);
     } catch (error) {
       console.error('Error opening email:', error);
+      // Fallback to basic compose
       router.push(`/email/ai-compose?to=${client.email}&clientName=${client.name}`);
     }
   };
