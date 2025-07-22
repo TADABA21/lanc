@@ -1,3 +1,4 @@
+// components/AIEmailComposer.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -22,7 +23,6 @@ import {
   Send, 
   Save, 
   X, 
-  Mail, 
   ChevronDown,
   Sparkles,
   Paperclip,
@@ -151,7 +151,6 @@ export default function AIEmailComposerScreen() {
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.to)) {
       Alert.alert('Error', 'Please enter a valid email address');
@@ -161,7 +160,6 @@ export default function AIEmailComposerScreen() {
     setLoading(true);
     
     try {
-      // Send the actual email
       const emailResult = await sendEmail({
         to: formData.to,
         subject: formData.subject,
@@ -169,54 +167,32 @@ export default function AIEmailComposerScreen() {
       });
 
       if (!emailResult.success) {
-        // Show more detailed error information
-        const errorMessage = emailResult.error || 'Failed to send email';
-        console.error('Email send error:', emailResult.details);
-        throw new Error(errorMessage);
+        throw new Error(emailResult.error || 'Failed to send email');
       }
 
-      // Log the email activity
-      await supabase
-        .from('activities')
-        .insert([{
-          type: 'email_sent',
-          title: `Email sent: ${formData.subject}`,
-          description: `To: ${formData.to}${emailResult.messageId ? `\nMessage ID: ${emailResult.messageId}` : ''}`,
-          entity_type: 'email',
-          entity_id: emailResult.messageId,
-          user_id: user?.id,
-        }]);
-
-      // Show success message with more details
-      const successMessage = `Your email has been sent successfully to ${formData.to}`;
-      const detailMessage = emailResult.messageId 
-        ? `\n\nMessage ID: ${emailResult.messageId}\n\nThe recipient should receive your email shortly.`
-        : '\n\nThe recipient should receive your email shortly.';
-      
-      Alert.alert('Email Sent! ✅', successMessage + detailMessage);
-      router.back();
-    } catch (error) {
-      console.error('Error sending email:', error);
-      
-      // Provide helpful error messages
-      let errorMessage = 'Failed to send email. Please try again.';
-      if (error instanceof Error) {
-        if (error.message.includes('API key') || error.message.includes('Invalid API key')) {
-          errorMessage = 'Email service configuration error. Please contact support.';
-        } else if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
-          errorMessage = 'Too many emails sent. Please wait a moment and try again.';
-        } else if (error.message.includes('invalid') || error.message.includes('Invalid')) {
-          errorMessage = 'Invalid email address or content. Please check and try again.';
-        } else if (error.message.includes('Network error')) {
-          errorMessage = 'Network connection error. Please check your internet connection and try again.';
-        } else if (error.message.includes('temporarily unavailable')) {
-          errorMessage = 'Email service is temporarily unavailable. Please try again in a few minutes.';
-        } else {
-          errorMessage = `Send failed: ${error.message}`;
+      // Log activity
+      await supabase.from('activities').insert([{
+        type: 'email_sent',
+        title: `Email sent: ${formData.subject}`,
+        description: `To: ${formData.to}`,
+        user_id: user?.id,
+        metadata: {
+          messageId: emailResult.messageId
         }
-      }
-      
-      Alert.alert('Send Failed ❌', errorMessage);
+      }]);
+
+      Alert.alert(
+        'Email Sent! ✅', 
+        `Email successfully sent to ${formData.to}`,
+        [
+          { text: 'OK', onPress: () => router.back() }
+        ]
+      );
+    } catch (error) {
+      Alert.alert(
+        'Send Failed ❌', 
+        error instanceof Error ? error.message : 'Failed to send email'
+      );
     } finally {
       setLoading(false);
     }
@@ -232,6 +208,13 @@ export default function AIEmailComposerScreen() {
           description: `To: ${formData.to}`,
           entity_type: 'email_draft',
           user_id: user?.id,
+          metadata: {
+            draftContent: {
+              to: formData.to,
+              subject: formData.subject,
+              body: formData.body
+            }
+          }
         }]);
 
       Alert.alert('Success', 'Draft saved successfully!');
