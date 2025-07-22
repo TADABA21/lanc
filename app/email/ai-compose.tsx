@@ -15,29 +15,29 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { generateWithGroq, emailPrompts } from '@/lib/groq';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, validateEmail, debugEmail } from '@/lib/email'; // Added debugEmail import
 import { Client } from '@/types/database';
-import { 
-  ArrowLeft, 
-  Send, 
-  Save, 
-  X, 
-  Mail, 
+import {
+  ArrowLeft,
+  Send,
+  Save,
+  X,
+  Mail,
   ChevronDown,
   Sparkles,
   Paperclip,
 } from 'lucide-react-native';
 
 export default function AIEmailComposerScreen() {
-  const { to, clientName, employeeName } = useLocalSearchParams<{ 
-    to?: string; 
-    clientName?: string; 
-    employeeName?: string; 
+  const { to, clientName, employeeName } = useLocalSearchParams<{
+    to?: string;
+    clientName?: string;
+    employeeName?: string;
   }>();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState({
     to: to || '',
     subject: '',
@@ -45,12 +45,13 @@ export default function AIEmailComposerScreen() {
     purpose: '',
     context: '',
   });
-  
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showPurposeDropdown, setShowPurposeDropdown] = useState(false);
+  const [emailValidationError, setEmailValidationError] = useState<string>(''); // Added email validation state
 
   const emailPurposes = [
     'Project Update',
@@ -69,16 +70,30 @@ export default function AIEmailComposerScreen() {
     fetchClients();
   }, []);
 
+  // Added email validation on change
+  useEffect(() => {
+    if (formData.to) {
+      const isValid = validateEmail(formData.to);
+      if (!isValid && formData.to.length > 0) {
+        setEmailValidationError('Please enter a valid email address');
+      } else {
+        setEmailValidationError('');
+      }
+    } else {
+      setEmailValidationError('');
+    }
+  }, [formData.to]);
+
   const fetchClients = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
         .eq('user_id', user.id)
         .order('name');
-      
+
       if (error) throw error;
       setClients(data || []);
     } catch (error) {
@@ -93,25 +108,25 @@ export default function AIEmailComposerScreen() {
     }
 
     setAiGenerating(true);
-    
+
     try {
       const recipientName = clientName || employeeName || formData.to.split('@')[0];
       const context = formData.context || `Professional communication regarding ${formData.purpose.toLowerCase()}`;
-      
+
       const messages = emailPrompts.generateEmail(
         formData.purpose,
         recipientName,
         context
       );
-      
+
       const aiResponse = await generateWithGroq(messages);
-      
+
       // Parse AI response
       const lines = aiResponse.split('\n');
       let subject = '';
       let body = '';
       let currentSection = '';
-      
+
       for (const line of lines) {
         const trimmedLine = line.trim();
         if (trimmedLine.toLowerCase().includes('subject:')) {
@@ -121,7 +136,7 @@ export default function AIEmailComposerScreen() {
           currentSection = 'body';
           continue;
         }
-        
+
         if (currentSection === 'body' && trimmedLine) {
           body += trimmedLine + '\n';
         } else if (!subject && !currentSection && trimmedLine) {
@@ -129,13 +144,13 @@ export default function AIEmailComposerScreen() {
           currentSection = 'body';
         }
       }
-      
+
       setFormData(prev => ({
         ...prev,
         subject: subject || `${formData.purpose} - ${recipientName}`,
         body: body.trim() || aiResponse,
       }));
-      
+
       Alert.alert('Success', 'AI has generated a professional email!');
     } catch (error) {
       console.error('Error generating with AI:', error);
@@ -145,84 +160,146 @@ export default function AIEmailComposerScreen() {
     }
   };
 
+  // Enhanced validation before sending
+  const validateBeforeSending = () => {
+    const errors: string[] = [];
+
+    if (!formData.to.trim()) {
+      errors.push('Recipient email is required');
+    } else if (!validateEmail(formData.to.trim())) {
+      errors.push('Invalid email format');
+    }
+
+    if (!formData.subject.trim()) {
+      errors.push('Email subject is required');
+    }
+
+    if (!formData.body.trim()) {
+      errors.push('Email body is required');
+    }
+
+    // Check if subject is too long (most email servers have limits)
+    if (formData.subject.length > 200) {
+      errors.push('Subject line is too long (max 200 characters)');
+    }
+
+    return errors;
+  };
+
   const handleSend = async () => {
-    if (!formData.to || !formData.subject || !formData.body) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Enhanced validation
+    const validationErrors = validateBeforeSending();
+    if (validationErrors.length > 0) {
+      Alert.alert('Validation Error', validationErrors.join('\n'));
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.to)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    // Debug email before sending (helpful for troubleshooting)
+    const emailDebugInfo = debugEmail(formData.to.trim());
+    console.log('📧 Email Debug Info:', emailDebugInfo);
+
+    if (!emailDebugInfo.valid) {
+      Alert.alert(
+        'Email Validation Failed',
+        `Issues found:\n${emailDebugInfo.issues.join('\n')}\n\nOriginal: "${emailDebugInfo.original}"\nCleaned: "${emailDebugInfo.cleaned}"`
+      );
       return;
     }
 
     setLoading(true);
-    
+
     try {
-      // Ensure we have a valid sender name and email
-      const senderEmail = user?.email || 'noreply@resend.dev';
+      // Prepare sender information for EmailJS
+      const senderEmail = user?.email || 'noreply@businessmanager.com';
       const senderName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Business Manager';
-      const fromAddress = `${senderName} <${senderEmail}>`;
-      
-      // Send the actual email
-      const emailResult = await sendEmail({
-        to: formData.to,
-        subject: formData.subject,
-        body: formData.body,
-        from: fromAddress,
+
+      // Clean and prepare email data
+      const emailData = {
+        to: formData.to.trim(), // Use trimmed email
+        subject: formData.subject.trim(),
+        body: formData.body.trim(),
+        from: senderEmail, // Don't format as "Name <email>" - let EmailJS handle it
+      };
+
+      console.log('📤 Sending email with data:', {
+        to: emailData.to,
+        subject: emailData.subject,
+        from: emailData.from,
+        bodyLength: emailData.body.length
       });
 
+      // Send the email via EmailJS
+      const emailResult = await sendEmail(emailData);
+
       if (!emailResult.success) {
-        // Show more detailed error information
         const errorMessage = emailResult.error || 'Failed to send email';
-        console.error('Email send error:', emailResult.details);
+        console.error('📧 Email send error:', {
+          error: errorMessage,
+          details: emailResult.details
+        });
         throw new Error(errorMessage);
       }
 
-      // Log the email activity
-      await supabase
-        .from('activities')
-        .insert([{
-          type: 'email_sent',
-          title: `Email sent: ${formData.subject}`,
-          description: `To: ${formData.to}${emailResult.messageId ? `\nMessage ID: ${emailResult.messageId}` : ''}`,
-          entity_type: 'email',
-          entity_id: emailResult.messageId,
-          user_id: user?.id,
-        }]);
+      console.log('✅ Email sent successfully:', emailResult);
 
-      // Show success message with more details
+      // Log the email activity
+      try {
+        // Generate a UUID for the email activity if messageId is not a valid UUID
+        const activityId = crypto.randomUUID();
+
+        await supabase
+          .from('activities')
+          .insert([{
+            type: 'email_sent',
+            title: `Email sent: ${formData.subject}`,
+            description: `To: ${formData.to}${emailResult.messageId ? `\nMessage ID: ${emailResult.messageId}` : ''}`,
+            entity_type: 'email',
+            entity_id: activityId, // Use generated UUID instead of messageId
+            user_id: user?.id,
+          }]);
+      } catch (logError) {
+        console.warn('Failed to log email activity:', logError);
+        // Don't fail the whole operation if logging fails
+      }
+
+      // Show success message
       const successMessage = `Your email has been sent successfully to ${formData.to}`;
-      const detailMessage = emailResult.messageId 
+      const detailMessage = emailResult.messageId
         ? `\n\nMessage ID: ${emailResult.messageId}\n\nThe recipient should receive your email shortly.`
         : '\n\nThe recipient should receive your email shortly.';
-      
-      Alert.alert('Email Sent! ✅', successMessage + detailMessage);
-      router.back();
+
+      Alert.alert('Email Sent! ✅', successMessage + detailMessage, [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+
     } catch (error) {
-      console.error('Error sending email:', error);
-      
-      // Provide helpful error messages
+      console.error('❌ Error in handleSend:', error);
+
       let errorMessage = 'Failed to send email. Please try again.';
+      let troubleshootingTips = '';
+
       if (error instanceof Error) {
-        if (error.message.includes('API key') || error.message.includes('Invalid API key')) {
-          errorMessage = 'Email service configuration error. Please contact support.';
-        } else if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
-          errorMessage = 'Too many emails sent. Please wait a moment and try again.';
-        } else if (error.message.includes('invalid') || error.message.includes('Invalid')) {
-          errorMessage = 'Invalid email address or content. Please check and try again.';
-        } else if (error.message.includes('Network error')) {
-          errorMessage = 'Network connection error. Please check your internet connection and try again.';
-        } else if (error.message.includes('temporarily unavailable')) {
-          errorMessage = 'Email service is temporarily unavailable. Please try again in a few minutes.';
+        const errorText = error.message.toLowerCase();
+
+        if (errorText.includes('recipients address is corrupted')) {
+          errorMessage = 'Invalid email address format detected.';
+          troubleshootingTips = '\n\nTroubleshooting:\n• Check for extra spaces or special characters\n• Ensure format is: user@domain.com\n• Try typing the email manually';
+        } else if (errorText.includes('invalid') || errorText.includes('configuration')) {
+          errorMessage = 'Email service configuration error.';
+          troubleshootingTips = '\n\nPlease contact support if this continues.';
+        } else if (errorText.includes('rate limit')) {
+          errorMessage = 'Too many emails sent recently.';
+          troubleshootingTips = '\n\nPlease wait a few minutes before trying again.';
+        } else if (errorText.includes('network')) {
+          errorMessage = 'Network connection error.';
+          troubleshootingTips = '\n\nPlease check your internet connection and try again.';
         } else {
-          errorMessage = `Send failed: ${error.message}`;
+          errorMessage = error.message;
+          troubleshootingTips = '\n\nIf this persists, please check your email address format.';
         }
       }
-      
-      Alert.alert('Send Failed ❌', errorMessage);
+
+      Alert.alert('Send Failed ❌', errorMessage + troubleshootingTips);
     } finally {
       setLoading(false);
     }
@@ -245,6 +322,11 @@ export default function AIEmailComposerScreen() {
       console.error('Error saving draft:', error);
       Alert.alert('Error', 'Failed to save draft.');
     }
+  };
+
+  // Enhanced email input handler with validation
+  const handleEmailChange = (text: string) => {
+    setFormData(prev => ({ ...prev, to: text }));
   };
 
   const styles = StyleSheet.create({
@@ -402,6 +484,15 @@ export default function AIEmailComposerScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
     },
+    inputError: { // Added error state for input
+      borderColor: colors.error,
+    },
+    errorText: { // Added error text style
+      fontSize: 12,
+      fontFamily: 'Inter-Regular',
+      color: colors.error,
+      marginTop: 4,
+    },
     dropdownContainer: {
       position: 'relative',
       zIndex: 1000,
@@ -501,6 +592,10 @@ export default function AIEmailComposerScreen() {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
+    primaryActionButtonDisabled: { // Added disabled state
+      backgroundColor: colors.border,
+      borderColor: colors.border,
+    },
     secondaryActionButton: {
       backgroundColor: colors.background,
       borderColor: colors.border,
@@ -513,10 +608,16 @@ export default function AIEmailComposerScreen() {
     primaryActionButtonText: {
       color: 'white',
     },
+    primaryActionButtonTextDisabled: { // Added disabled text state
+      color: colors.textMuted,
+    },
     secondaryActionButtonText: {
       color: colors.primary,
     },
   });
+
+  // Check if form is valid for sending
+  const isFormValid = formData.to.trim() && formData.subject.trim() && formData.body.trim() && !emailValidationError;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -527,7 +628,7 @@ export default function AIEmailComposerScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>AI Email Composer</Text>
         </View>
-        
+
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.headerButton, styles.headerButtonSecondary]}
@@ -572,7 +673,7 @@ export default function AIEmailComposerScreen() {
         {/* Email Setup */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Setup</Text>
-          
+
           <View style={[styles.purposeDropdownGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               Email Purpose <Text style={styles.required}>*</Text>
@@ -592,7 +693,7 @@ export default function AIEmailComposerScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
+
             {showPurposeDropdown && (
               <View style={styles.dropdownList}>
                 <ScrollView style={{ maxHeight: 200 }}>
@@ -630,7 +731,7 @@ export default function AIEmailComposerScreen() {
         {/* Email Composition */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Composition</Text>
-          
+
           <View style={[styles.dropdownInputGroup, styles.dropdownContainer]}>
             <Text style={styles.label}>
               To <Text style={styles.required}>*</Text>
@@ -650,7 +751,7 @@ export default function AIEmailComposerScreen() {
               </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            
+
             {showClientDropdown && (
               <View style={styles.dropdownList}>
                 <ScrollView style={{ maxHeight: 200 }}>
@@ -671,16 +772,24 @@ export default function AIEmailComposerScreen() {
                 </ScrollView>
               </View>
             )}
-            
+
             <TextInput
-              style={[styles.input, { marginTop: 8 }]}
+              style={[
+                styles.input,
+                { marginTop: 8 },
+                emailValidationError ? styles.inputError : null
+              ]}
               value={formData.to}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, to: text }))}
+              onChangeText={handleEmailChange}
               placeholder="Or enter email address manually"
               placeholderTextColor={colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false} // Added to prevent auto-correction interfering with email
             />
+            {emailValidationError ? (
+              <Text style={styles.errorText}>{emailValidationError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputGroup}>
@@ -720,7 +829,7 @@ export default function AIEmailComposerScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.secondaryActionButton]}
           onPress={handleSaveDraft}
         >
@@ -729,14 +838,24 @@ export default function AIEmailComposerScreen() {
             Save Draft
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
-          style={[styles.actionButton, styles.primaryActionButton]}
+          style={[
+            styles.actionButton,
+            isFormValid ? styles.primaryActionButton : styles.primaryActionButtonDisabled
+          ]}
           onPress={handleSend}
-          disabled={loading}
+          disabled={loading || !isFormValid}
         >
-          <Send size={16} color="white" />
-          <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Send size={16} color={isFormValid ? "white" : colors.textMuted} />
+          )}
+          <Text style={[
+            styles.actionButtonText,
+            isFormValid ? styles.primaryActionButtonText : styles.primaryActionButtonTextDisabled
+          ]}>
             {loading ? 'Sending...' : 'Send Email'}
           </Text>
         </TouchableOpacity>

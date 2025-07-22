@@ -1,4 +1,6 @@
-// Email service integration
+// EmailJS service integration for React Native - FIXED VERSION
+import emailjs from '@emailjs/react-native';
+
 export interface EmailData {
   to: string;
   subject: string;
@@ -16,124 +18,248 @@ export interface EmailResponse {
   details?: any;
 }
 
-// Enhanced Resend API integration for direct email sending
-export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
-  const RESEND_API_KEY = process.env.EXPO_PUBLIC_RESEND_API_KEY;
+// Initialize EmailJS with your credentials
+const initEmailJS = () => {
+  const publicKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
   
-  if (!RESEND_API_KEY) {
-    console.warn('No Resend API key found in environment variables. Email will be simulated.');
+  if (publicKey) {
+    emailjs.init({
+      publicKey,
+    });
+  }
+};
+
+// Call initialization
+initEmailJS();
+
+// Enhanced email validation with more comprehensive checks
+export function validateEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') {
+    return false;
+  }
+  
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  const trimmedEmail = email.trim();
+  
+  // Basic format check
+  if (!emailRegex.test(trimmedEmail)) {
+    return false;
+  }
+  
+  // Additional checks
+  if (trimmedEmail.length > 254) return false; // RFC 5321 limit
+  if (trimmedEmail.includes('..')) return false; // No consecutive dots
+  if (trimmedEmail.startsWith('.') || trimmedEmail.endsWith('.')) return false;
+  if (trimmedEmail.includes('@.') || trimmedEmail.includes('.@')) return false;
+  
+  return true;
+}
+
+// Clean and normalize email address
+function cleanEmail(email: string): string {
+  if (!email || typeof email !== 'string') {
+    return '';
+  }
+  
+  return email
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '') // Remove any whitespace
+    .replace(/[^\w@.-]/g, ''); // Remove special characters except valid email chars
+}
+
+// Enhanced EmailJS integration for direct email sending
+export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
+  const serviceId = process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID;
+  const templateId = process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID;
+  const publicKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
+  
+  if (!serviceId || !templateId || !publicKey) {
+    console.warn('EmailJS configuration is missing. Falling back to simulation.');
     return simulateEmailSend(emailData);
   }
 
-  // Validate email data
-  if (!emailData.to || !emailData.subject || !emailData.body) {
-    return {
-      success: false,
-      error: 'Missing required email fields (to, subject, or body)',
+  // Clean and validate email with detailed logging
+  console.log('🔍 Original email data:', JSON.stringify(emailData, null, 2));
+  
+  const cleanedEmail = cleanEmail(emailData.to);
+  console.log('🧹 Cleaned email:', cleanedEmail);
+  
+  // Enhanced validation with specific error messages
+  if (!emailData.to) {
+    return { success: false, error: 'Recipient email is required' };
+  }
+  
+  if (!cleanedEmail) {
+    return { success: false, error: 'Recipient email cannot be empty after cleaning' };
+  }
+
+  if (!validateEmail(cleanedEmail)) {
+    return { 
+      success: false, 
+      error: `Invalid email format: "${cleanedEmail}". Please use format: user@example.com` 
     };
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(emailData.to)) {
-    return {
-      success: false,
-      error: 'Invalid email address format',
-    };
+  // Validate subject and body
+  if (!emailData.subject?.trim()) {
+    return { success: false, error: 'Email subject is required' };
+  }
+
+  if (!emailData.body?.trim()) {
+    return { success: false, error: 'Email body is required' };
   }
 
   try {
-    const payload = {
-      from: emailData.from || 'Business Manager <noreply@resend.dev>',
-      to: [emailData.to],
-      subject: emailData.subject,
-      html: formatEmailBody(emailData.body),
-      text: emailData.body, // Include plain text version
-      ...(emailData.cc && emailData.cc.length > 0 && { cc: emailData.cc }),
-      ...(emailData.bcc && emailData.bcc.length > 0 && { bcc: emailData.bcc }),
-      ...(emailData.replyTo && { reply_to: emailData.replyTo }),
-    };
-
-    console.log('📧 Sending email via Resend API...');
-    console.log('To:', emailData.to);
+    console.log('📧 Sending email via EmailJS...');
+    console.log('Service ID:', serviceId);
+    console.log('Template ID:', templateId);
+    console.log('To:', cleanedEmail);
     console.log('Subject:', emailData.subject);
 
-    let response: Response;
-    let responseData: any;
-    
-    try {
-      response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-    } catch (fetchError) {
-      console.error('❌ Network error when calling Resend API:', fetchError);
-      return {
-        success: false,
-        error: 'Network error: Unable to connect to email service. Please check your internet connection.',
-        details: fetchError,
-      };
-    }
-
-    // Try to parse response as JSON, handle cases where it might not be JSON
-    try {
-      responseData = await response.json();
-    } catch (jsonError) {
-      console.error('❌ Failed to parse response as JSON:', jsonError);
-      const responseText = await response.text().catch(() => 'Unable to read response');
-      console.error('Raw response:', responseText);
+    // Prepare template parameters for EmailJS with careful string handling
+    const templateParams = {
+      // Core recipient info - ensuring clean strings
+      to_email: cleanedEmail,
+      to_name: cleanedEmail.split('@')[0] || 'User',
       
-      return {
-        success: false,
-        error: `Invalid response from email service. Status: ${response.status}`,
-        details: { status: response.status, responseText },
-      };
-    }
-
-    if (!response.ok) {
-      console.error('❌ Resend API Error:', responseData);
+      // Sender info with fallbacks
+      from_name: (emailData.from || 'Business Manager').trim(),
+      from_email: cleanEmail(emailData.from || 'noreply@businessmanager.com'),
       
-      // Handle specific Resend API errors
-      let errorMessage = 'Failed to send email';
-      if (responseData.message) {
-        errorMessage = responseData.message;
-      } else if (responseData.error) {
-        errorMessage = responseData.error;
-      } else if (response.status === 401) {
-        errorMessage = 'Invalid API key. Please check your Resend configuration.';
-      } else if (response.status === 429) {
-        errorMessage = 'Rate limit exceeded. Please try again later.';
-      } else if (response.status >= 500) {
-        errorMessage = 'Email service temporarily unavailable. Please try again later.';
+      // Content with proper trimming
+      subject: emailData.subject.trim(),
+      message: emailData.body.trim(),
+      
+      // Reply-to with validation
+      reply_to: cleanEmail(emailData.replyTo || emailData.from || 'noreply@businessmanager.com'),
+      
+      // Optional fields with proper handling
+      ...(emailData.cc?.length && { 
+        cc: emailData.cc
+          .map(email => cleanEmail(email))
+          .filter(email => validateEmail(email))
+          .join(', ') 
+      }),
+      
+      ...(emailData.bcc?.length && { 
+        bcc: emailData.bcc
+          .map(email => cleanEmail(email))
+          .filter(email => validateEmail(email))
+          .join(', ') 
+      }),
+    };
+
+    console.log('📨 Template params:', JSON.stringify(templateParams, null, 2));
+
+    // Validate all email fields in template params
+    const emailFields = ['to_email', 'from_email', 'reply_to'];
+    for (const field of emailFields) {
+      const email = templateParams[field as keyof typeof templateParams];
+      if (email && typeof email === 'string' && !validateEmail(email)) {
+        return { 
+          success: false, 
+          error: `Invalid ${field.replace('_', ' ')}: ${email}` 
+        };
       }
-      
-      return {
-        success: false,
-        error: errorMessage,
-        details: responseData,
-      };
     }
 
-    console.log('✅ Email sent successfully via Resend');
-    console.log('Message ID:', responseData.id);
+    const response = await emailjs.send(
+      serviceId,
+      templateId,
+      templateParams
+    );
+
+    console.log('✅ Email sent successfully via EmailJS');
+    console.log('Response:', response);
 
     return {
       success: true,
-      messageId: responseData.id,
-      details: responseData,
+      messageId: response.text || 'emailjs_' + Date.now(),
+      details: response,
     };
+    
   } catch (error) {
-    console.error('❌ Error sending email:', error);
+    console.error('❌ Error sending email via EmailJS:', error);
+    
+    // Enhanced error handling with specific EmailJS error codes
+    let errorMessage = 'Failed to send email. Please try again.';
+    
+    if (error && typeof error === 'object') {
+      const emailError = error as any;
+      
+      // Handle EmailJS specific errors
+      if (emailError.status) {
+        switch (emailError.status) {
+          case 400:
+            errorMessage = 'Bad request - please check your email data format';
+            break;
+          case 401:
+            errorMessage = 'Unauthorized - please check your EmailJS public key';
+            break;
+          case 403:
+            errorMessage = 'Forbidden - please check your EmailJS service permissions';
+            break;
+          case 404:
+            errorMessage = 'Service or template not found - please check your EmailJS configuration';
+            break;
+          case 422:
+            if (emailError.text?.includes('recipients address is corrupted')) {
+              errorMessage = `Invalid recipient email format. Email: "${emailData.to}" was processed as: "${cleanedEmail}"`;
+            } else if (emailError.text?.includes('template')) {
+              errorMessage = 'Email template error - please check your EmailJS template configuration';
+            } else {
+              errorMessage = `Email data validation failed: ${emailError.text || 'Unknown validation error'}`;
+            }
+            break;
+          case 429:
+            errorMessage = 'Rate limit exceeded - please wait before sending another email';
+            break;
+          case 500:
+            errorMessage = 'Server error - please try again later';
+            break;
+          default:
+            errorMessage = `EmailJS error (${emailError.status}): ${emailError.text || 'Unknown error'}`;
+        }
+      } else if (error instanceof Error) {
+        if (error.message.includes('Network')) {
+          errorMessage = 'Network connection error. Please check your internet connection and try again.';
+        } else {
+          errorMessage = `Send failed: ${error.message}`;
+        }
+      }
+    }
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred while sending email',
+      error: errorMessage,
       details: error,
     };
   }
+}
+
+// Debug function to test email formatting
+export function debugEmail(email: string): {
+  original: string;
+  cleaned: string;
+  valid: boolean;
+  issues: string[];
+} {
+  const issues: string[] = [];
+  const cleaned = cleanEmail(email);
+  
+  if (!email) issues.push('Email is empty');
+  if (email !== email.trim()) issues.push('Email has leading/trailing whitespace');
+  if (email.includes(' ')) issues.push('Email contains spaces');
+  if (email !== cleaned) issues.push('Email contains invalid characters');
+  if (!validateEmail(cleaned)) issues.push('Email format is invalid');
+  
+  return {
+    original: email,
+    cleaned,
+    valid: validateEmail(cleaned),
+    issues
+  };
 }
 
 // Send email with template support
@@ -145,9 +271,10 @@ export async function sendEmailWithTemplate(
   },
   emailData: Partial<EmailData> = {}
 ): Promise<EmailResponse> {
-  const RESEND_API_KEY = process.env.EXPO_PUBLIC_RESEND_API_KEY;
+  const serviceId = process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID;
+  const templateId = templateData.templateId || process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID;
   
-  if (!RESEND_API_KEY) {
+  if (!serviceId || !templateId) {
     return simulateEmailSend({
       to: templateData.to,
       subject: 'Template Email',
@@ -156,53 +283,48 @@ export async function sendEmailWithTemplate(
     });
   }
 
+  // Clean and validate the recipient email
+  const cleanedEmail = cleanEmail(templateData.to);
+  if (!validateEmail(cleanedEmail)) {
+    return {
+      success: false,
+      error: `Invalid recipient email: ${templateData.to}`,
+    };
+  }
+
   try {
-    const payload = {
-      from: emailData.from || 'Business Manager <noreply@resend.dev>',
-      to: [templateData.to],
-      ...(templateData.templateId && { template: templateData.templateId }),
-      ...(templateData.variables && { template_variables: templateData.variables }),
-      ...emailData,
+    const templateParams = {
+      to_email: cleanedEmail,
+      ...templateData.variables,
+      ...Object.fromEntries(
+        Object.entries(emailData).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value.trim() : value
+        ])
+      ),
     };
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: responseData.message || 'Failed to send template email',
-        details: responseData,
-      };
-    }
+    const response = await emailjs.send(serviceId, templateId, templateParams);
 
     return {
       success: true,
-      messageId: responseData.id,
-      details: responseData,
+      messageId: response.text || 'emailjs_template_' + Date.now(),
+      details: response,
     };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+      details: error,
     };
   }
 }
 
-// Fallback simulation for development/testing
+// Rest of the functions remain the same...
 async function simulateEmailSend(emailData: EmailData): Promise<EmailResponse> {
-  // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1500));
   
-  console.log('📧 Email Simulation (No API Key):');
+  console.log('📧 Email Simulation (EmailJS not configured):');
   console.log('To:', emailData.to);
   console.log('Subject:', emailData.subject);
   console.log('Body Preview:', emailData.body.substring(0, 100) + '...');
@@ -213,7 +335,37 @@ async function simulateEmailSend(emailData: EmailData): Promise<EmailResponse> {
   };
 }
 
-// Enhanced HTML formatting with better styling
+export async function sendBulkEmails(
+  emails: EmailData[]
+): Promise<{ success: EmailResponse[]; failed: { email: EmailData; error: string }[] }> {
+  const success: EmailResponse[] = [];
+  const failed: { email: EmailData; error: string }[] = [];
+
+  for (const email of emails) {
+    try {
+      const result = await sendEmail(email);
+      if (result.success) {
+        success.push(result);
+      } else {
+        failed.push({ email, error: result.error || 'Unknown error' });
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      failed.push({ 
+        email, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }
+
+  return { success, failed };
+}
+
+export function previewEmail(emailData: EmailData): string {
+  return formatEmailBody(emailData.body);
+}
+
 function formatEmailBody(body: string): string {
   const htmlBody = body
     .split('\n')
@@ -222,7 +374,6 @@ function formatEmailBody(body: string): string {
       if (trimmedLine.length === 0) {
         return '<br>';
       }
-      // Convert URLs to clickable links
       const urlRegex = /(https?:\/\/[^\s]+)/g;
       const linkedLine = trimmedLine.replace(urlRegex, '<a href="$1" style="color: #3B82F6;">$1</a>');
       return `<p style="margin: 8px 0; line-height: 1.5;">${linkedLine}</p>`;
@@ -240,97 +391,23 @@ function formatEmailBody(body: string): string {
   `;
 }
 
-// Bulk email sending
-export async function sendBulkEmails(
-  emails: EmailData[]
-): Promise<{ success: EmailResponse[]; failed: { email: EmailData; error: string }[] }> {
-  const success: EmailResponse[] = [];
-  const failed: { email: EmailData; error: string }[] = [];
-
-  // Send emails with a small delay to avoid rate limiting
-  for (const email of emails) {
-    try {
-      const result = await sendEmail(email);
-      if (result.success) {
-        success.push(result);
-      } else {
-        failed.push({ email, error: result.error || 'Unknown error' });
-      }
-      
-      // Small delay between emails
-      await new Promise(resolve => setTimeout(resolve, 100));
-    } catch (error) {
-      failed.push({ 
-        email, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      });
-    }
-  }
-
-  return { success, failed };
-}
-
-// Email validation utility
-export function validateEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-// Email preview utility
-export function previewEmail(emailData: EmailData): string {
-  return formatEmailBody(emailData.body);
-}
-
-// Alternative email services you can use:
 export const EMAIL_SERVICES = {
-  RESEND: 'resend',
+  EMAILJS: 'emailjs',
+  SMTP: 'smtp',
   SENDGRID: 'sendgrid',
   MAILGUN: 'mailgun',
-  SMTP: 'smtp',
-  POSTMARK: 'postmark',
 } as const;
 
-// SendGrid implementation (alternative)
-export async function sendEmailWithSendGrid(emailData: EmailData): Promise<EmailResponse> {
-  const SENDGRID_API_KEY = process.env.EXPO_PUBLIC_SENDGRID_API_KEY;
-  
-  if (!SENDGRID_API_KEY) {
-    return simulateEmailSend(emailData);
-  }
+export const getEmailJSConfig = () => {
+  return {
+    serviceId: process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID,
+    templateId: process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID,
+    publicKey: process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY,
+    privateKey: process.env.EXPO_PUBLIC_EMAILJS_PRIVATE_KEY,
+  };
+};
 
-  try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [{
-          to: [{ email: emailData.to }],
-          subject: emailData.subject,
-        }],
-        from: { email: emailData.from || 'noreply@yourdomain.com' },
-        content: [{
-          type: 'text/html',
-          value: formatEmailBody(emailData.body),
-        }],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send email via SendGrid');
-    }
-
-    return {
-      success: true,
-      messageId: response.headers.get('x-message-id') || undefined,
-    };
-  } catch (error) {
-    console.error('Error sending email with SendGrid:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
+export const isEmailJSConfigured = (): boolean => {
+  const config = getEmailJSConfig();
+  return !!(config.serviceId && config.templateId && config.publicKey);
+};
