@@ -10,7 +10,6 @@ import {
   Platform,
   Modal,
   TextInput,
-
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -49,6 +48,7 @@ import { UploadedFile } from '@/lib/fileUpload';
 import * as FileSystem from 'expo-file-system';
 import * as Linking from 'expo-linking';
 import { FlatList } from 'react-native';
+
 type ProjectWithRelations = Project & {
   client?: Client;
   project_members?: Array<{ team_member: TeamMember }>;
@@ -92,6 +92,7 @@ export default function ProjectDetailScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'files' | 'time' | 'tasks'>('overview');
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +100,8 @@ export default function ProjectDetailScreen() {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<ProjectFile | null>(null);
 
   // Form states
   const [newTask, setNewTask] = useState({ title: '', description: '' });
@@ -596,7 +599,19 @@ export default function ProjectDetailScreen() {
       fetchTimeEntries();
       fetchFiles();
     }
-  }, [id]);
+    const refreshFiles = () => {
+      if (activeTab === 'files') {
+        fetchFiles();
+      }
+    };
+
+    // For web
+    if (Platform.OS === 'web') {
+      window.addEventListener('focus', refreshFiles);
+      return () => window.removeEventListener('focus', refreshFiles);
+    }
+
+  }, [id, activeTab,]);
 
   const fetchProjectDetails = async () => {
     if (!user || !id) return;
@@ -687,34 +702,44 @@ export default function ProjectDetailScreen() {
   const fetchFiles = async () => {
     if (!user || !id) return;
 
+    setFilesLoading(true);
     try {
       const { data, error } = await supabase
         .from('project_files')
         .select('*')
         .eq('project_id', id)
+        .eq('uploaded_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching files:', error);
+        setFiles([]);
         return;
       }
 
-      // Map database fields to your ProjectFile interface
-      const projectFiles: ProjectFile[] = (data || []).map(file => ({
+      if (!data || data.length === 0) {
+        setFiles([]);
+        return;
+      }
+
+      // Map database fields to ProjectFile interface - CORRECTED field names
+      const projectFiles: ProjectFile[] = data.map(file => ({
         id: file.id,
-        name: file.filename,  // matches database schema
+        name: file.file_name,      // Changed from filename to file_name
         size: file.file_size,
-        type: file.filetype,  // matches database schema
-        url: file.file_url,
+        type: file.file_type,      // Changed from filetype to file_type
+        url: `${file.file_url}?t=${Date.now()}`,
         uploaded_at: file.created_at
       }));
 
       setFiles(projectFiles);
     } catch (error) {
       console.error('Error fetching project files:', error);
+      setFiles([]);
+    } finally {
+      setFilesLoading(false);
     }
   };
-
   const updateProjectStatus = async (newStatus: 'todo' | 'in_progress' | 'completed') => {
     if (!project || !user) return;
 
@@ -831,15 +856,17 @@ export default function ProjectDetailScreen() {
     }
   };
   const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
+    if (!user || !id) return;
+
     try {
-      // Save file records to database with correct field names
+      // Save file records to database with CORRECT field names
       const fileRecords = uploadedFiles.map(file => ({
         project_id: id,
-        filename: file.name,  // matches database schema
+        file_name: file.name,        // Changed from filename to file_name
         file_size: file.size,
-        filetype: file.type,  // matches database schema
+        file_type: file.type,        // Changed from filetype to file_type
         file_url: file.url,
-        uploaded_by: user?.id,
+        uploaded_by: user.id,
         created_at: new Date().toISOString(),
       }));
 
@@ -850,13 +877,13 @@ export default function ProjectDetailScreen() {
 
       if (error) throw error;
 
-      // Update local state with the actual database records
+      // Update local state with the actual database records - CORRECTED field names
       const newFiles: ProjectFile[] = (insertedFiles || []).map(file => ({
         id: file.id,
-        name: file.filename,  // matches database schema
+        name: file.file_name,        // Changed from filename to file_name
         size: file.file_size,
-        type: file.filetype,  // matches database schema
-        url: file.file_url,
+        type: file.file_type,        // Changed from filetype to file_type
+        url: `${file.file_url}?t=${Date.now()}`,
         uploaded_at: file.created_at,
       }));
 
@@ -871,7 +898,7 @@ export default function ProjectDetailScreen() {
           description: `Files: ${uploadedFiles.map(f => f.name).join(', ')}`,
           entity_type: 'project',
           entity_id: id,
-          user_id: user?.id,
+          user_id: user.id,
         }]);
 
       await fetchActivities();
@@ -881,7 +908,6 @@ export default function ProjectDetailScreen() {
       Alert.alert('Error', 'Files uploaded but failed to save records');
     }
   };
-
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1046,36 +1072,36 @@ export default function ProjectDetailScreen() {
       }
     };
 
-    const handleDeleteFile = async (fileId: string, fileUrl: string) => {
+    const handleDeleteFile = async (fileId: string, fileUrl: string, fileName: string) => {
+      if (!user || !id) return;
+
       try {
-        // Extract the file path from the URL
-        const urlParts = fileUrl.split('/');
-        const bucketIndex = urlParts.findIndex(part => part === 'project-files');
-        let filePath = '';
-
-        if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
-          filePath = urlParts.slice(bucketIndex + 1).join('/');
-        }
-
-        // Delete from storage if we have a valid path
-        if (filePath) {
-          const { error: storageError } = await supabase.storage
-            .from('project-files')
-            .remove([filePath]);
-
-          if (storageError) {
-            console.warn('Error deleting from storage:', storageError);
-            // Still try to delete from database
-          }
-        }
-
-        // Delete from database
+        // First delete from database
         const { error: dbError } = await supabase
           .from('project_files')
           .delete()
-          .eq('id', fileId);
+          .eq('id', fileId)
+          .eq('uploaded_by', user.id); // Ensure user owns the file
 
         if (dbError) throw dbError;
+
+        // Then delete from storage if URL is valid
+        if (fileUrl) {
+          const urlParts = fileUrl.split('/');
+          const bucketIndex = urlParts.findIndex(part => part === 'project-files');
+
+          if (bucketIndex !== -1) {
+            const filePath = urlParts.slice(bucketIndex + 1).join('/').split('?')[0]; // Remove query params
+
+            const { error: storageError } = await supabase.storage
+              .from('project-files')
+              .remove([filePath]);
+
+            if (storageError) {
+              console.warn('File deleted from DB but not from storage:', storageError);
+            }
+          }
+        }
 
         // Update UI
         setFiles(prev => prev.filter(f => f.id !== fileId));
@@ -1086,21 +1112,26 @@ export default function ProjectDetailScreen() {
           .insert([{
             type: 'file_deleted',
             title: 'File deleted from project',
-            description: `File deleted from project: ${project?.name}`,
+            description: `File "${fileName}" deleted from project: ${project?.name}`,
             entity_type: 'project',
             entity_id: id,
-            user_id: user?.id,
+            user_id: user.id,
           }]);
 
         await fetchActivities();
+
+        // Close modal and reset state
+        setShowDeleteModal(false);
+        setFileToDelete(null);
+
         Alert.alert('Success', 'File deleted successfully');
       } catch (error) {
         console.error('Error deleting file:', error);
         Alert.alert('Error', 'Failed to delete file');
       }
     };
-
     return (
+
       <View style={styles.tabContent}>
         <TouchableOpacity
           style={[styles.uploadButton, { backgroundColor: colors.primary }]}
@@ -1142,18 +1173,8 @@ export default function ProjectDetailScreen() {
               <TouchableOpacity
                 onPress={(e) => {
                   e.stopPropagation(); // Prevent triggering the preview
-                  Alert.alert(
-                    'Delete File',
-                    `Are you sure you want to delete "${item.name}"?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Delete',
-                        style: 'destructive',
-                        onPress: () => handleDeleteFile(item.id, item.url)
-                      }
-                    ]
-                  );
+                  setFileToDelete(item);
+                  setShowDeleteModal(true);
                 }}
                 style={[styles.deleteButton, { backgroundColor: colors.error }]}
               >
@@ -1179,6 +1200,7 @@ export default function ProjectDetailScreen() {
             </View>
           }
         />
+
       </View>
     );
   };
@@ -1284,6 +1306,65 @@ export default function ProjectDetailScreen() {
       </View>
     </View>
   );
+
+  const handleDeleteFile = async (fileId: string, fileUrl: string, fileName: string) => {
+    if (!user || !id) return;
+
+    try {
+      // First delete from database
+      const { error: dbError } = await supabase
+        .from('project_files')
+        .delete()
+        .eq('id', fileId)
+        .eq('uploaded_by', user.id); // Ensure user owns the file
+
+      if (dbError) throw dbError;
+
+      // Then delete from storage if URL is valid
+      if (fileUrl) {
+        const urlParts = fileUrl.split('/');
+        const bucketIndex = urlParts.findIndex(part => part === 'project-files');
+
+        if (bucketIndex !== -1) {
+          const filePath = urlParts.slice(bucketIndex + 1).join('/').split('?')[0]; // Remove query params
+
+          const { error: storageError } = await supabase.storage
+            .from('project-files')
+            .remove([filePath]);
+
+          if (storageError) {
+            console.warn('File deleted from DB but not from storage:', storageError);
+          }
+        }
+      }
+
+      // Update UI
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'file_deleted',
+          title: 'File deleted from project',
+          description: `File "${fileName}" deleted from project: ${project?.name}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+
+      // Close modal and reset state
+      setShowDeleteModal(false);
+      setFileToDelete(null);
+
+      Alert.alert('Success', 'File deleted successfully');
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      Alert.alert('Error', 'Failed to delete file');
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1535,37 +1616,7 @@ export default function ProjectDetailScreen() {
               onFilesSelected={(selectedFiles) => {
                 console.log('Files selected:', selectedFiles);
               }}
-              onFilesUploaded={(uploadedFiles) => {
-                // Add the uploaded files to state
-                const newFiles = uploadedFiles.map(file => ({
-                  id: file.id,
-                  name: file.name,
-                  size: file.size,
-                  type: file.type,
-                  url: file.url,
-                  uploaded_at: new Date().toISOString(),
-                }));
-
-                setFiles(prev => [...prev, ...newFiles]);
-
-                // Create activity log
-                if (user && id) {
-                  supabase
-                    .from('activities')
-                    .insert([{
-                      type: 'files_uploaded',
-                      title: `${uploadedFiles.length} file(s) uploaded`,
-                      description: `Files: ${uploadedFiles.map(f => f.name).join(', ')}`,
-                      entity_type: 'project',
-                      entity_id: id,
-                      user_id: user.id,
-                    }])
-                    .then(() => fetchActivities());
-                }
-
-                Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully!`);
-                setShowUploadModal(false);
-              }}
+              onFilesUploaded={handleFilesUploaded}
               maxFiles={10}
               allowedTypes={['application/pdf', 'image/*', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.*']}
               autoUpload={true}
@@ -1580,6 +1631,88 @@ export default function ProjectDetailScreen() {
               >
                 <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
                   Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete File Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDeleteModal(false);
+          setFileToDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete File</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setFileToDelete(null);
+                }}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[styles.description, { color: colors.textSecondary, textAlign: 'center' }]}>
+                Are you sure you want to delete this file? This action cannot be undone.
+              </Text>
+
+              {fileToDelete && (
+                <View style={[
+                  styles.fileItem,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    marginTop: 16,
+                    opacity: 0.8
+                  }
+                ]}>
+                  <FileText size={20} color={colors.primary} style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
+                      {fileToDelete.name}
+                    </Text>
+                    <Text style={[styles.fileSize, { color: colors.textSecondary }]}>
+                      {(fileToDelete.size / 1024 / 1024).toFixed(2)} MB • {fileToDelete.type}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setFileToDelete(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.error, borderColor: colors.error }]}
+                onPress={() => {
+                  if (fileToDelete) {
+                    handleDeleteFile(fileToDelete.id, fileToDelete.url, fileToDelete.name);
+                  }
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>
+                  Delete File
                 </Text>
               </TouchableOpacity>
             </View>

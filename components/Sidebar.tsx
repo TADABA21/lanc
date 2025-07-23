@@ -373,11 +373,11 @@ export function Sidebar() {
         <View style={sidebarStyles.logo}>
           <View style={sidebarStyles.logoIcon}>
             <Text style={{ color: 'white', fontFamily: 'Inter-Bold', fontSize: 16 }}>
-              BM
+             LT
             </Text>
           </View>
           {!isCollapsed && (
-            <Text style={sidebarStyles.logoText}>Business Manager</Text>
+            <Text style={sidebarStyles.logoText}>LANCELOT</Text>
           )}
         </View>
         

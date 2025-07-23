@@ -375,7 +375,7 @@ export default function DashboardScreen() {
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.logo}>
-                <Text style={styles.logoText}>BM</Text>
+                <Text style={styles.logoText}>LT</Text>
               </View>
               <View>
                 <Text style={styles.greeting}>{getGreeting()}, {getFirstName()}!</Text>

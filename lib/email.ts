@@ -124,7 +124,7 @@ export async function sendEmail(emailData: EmailData): Promise<EmailResponse> {
       to_name: cleanedEmail.split('@')[0] || 'User',
       
       // Sender info with fallbacks
-      from_name: (emailData.from || 'Business Manager').trim(),
+      from_name: (emailData.from || 'LANCELOT').trim(),
       from_email: cleanEmail(emailData.from || 'noreply@businessmanager.com'),
       
       // Content with proper trimming
@@ -385,7 +385,7 @@ function formatEmailBody(body: string): string {
       ${htmlBody}
       <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
       <p style="font-size: 12px; color: #6b7280; margin: 0;">
-        Sent via Business Manager
+        Sent via LANCELOT
       </p>
     </div>
   `;

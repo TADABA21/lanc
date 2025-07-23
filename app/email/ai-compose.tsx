@@ -211,7 +211,7 @@ export default function AIEmailComposerScreen() {
     try {
       // Prepare sender information for EmailJS
       const senderEmail = user?.email || 'noreply@businessmanager.com';
-      const senderName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Business Manager';
+      const senderName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'LANCELOT';
 
       // Clean and prepare email data
       const emailData = {

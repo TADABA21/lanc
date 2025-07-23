@@ -38,8 +38,10 @@ export async function uploadFile(
   try {
     // Generate unique filename
     const timestamp = Date.now();
-    const extension = file.name.split('.').pop() || '';
-    const uniqueName = `${timestamp}_${file.name}`;
+    const fileNameParts = file.name.split('.');
+    const extension = fileNameParts.length > 1 ? fileNameParts.pop() : '';
+    const baseName = fileNameParts.join('.');
+    const uniqueName = `${timestamp}_${baseName}${extension ? '.' + extension : ''}`;
     const filePath = folder ? `${folder}/${uniqueName}` : uniqueName;
 
     let fileData: ArrayBuffer | Uint8Array;
@@ -81,7 +83,7 @@ export async function uploadFile(
       .getPublicUrl(data.path);
 
     return {
-      id: data.path,
+      id: crypto.randomUUID(), // Generate a proper UUID for the database record
       name: file.name,
       size: file.size || 0,
       type: file.type,
@@ -110,14 +112,19 @@ export async function uploadFiles(
 
 // Delete file from Supabase Storage
 export async function deleteFile(filePath: string, bucket = 'project-files'): Promise<void> {
+  console.log('🗑️ Deleting file from storage:', { filePath, bucket });
+  
   try {
     const { error } = await supabase.storage
       .from(bucket)
       .remove([filePath]);
 
     if (error) {
+      console.error('❌ Storage deletion error:', error);
       throw error;
     }
+    
+    console.log('✅ File deleted from storage successfully');
   } catch (error) {
     console.error('Error deleting file:', error);
     throw new Error(`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
       .single();
 
     // Prepare sender information
-    const senderName = userProfile?.full_name || user.email?.split('@')[0] || 'Business Manager';
+    const senderName = userProfile?.full_name || user.email?.split('@')[0] || 'LANCELOT';
     const senderEmail = user.email || 'noreply@resend.dev';
     const fromAddress = emailData.from || `${senderName} <${senderEmail}>`;
 
@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
           ${htmlBody}
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #6b7280; margin: 0;">
-            Sent via Business Manager
+            Sent via LANCEOT
           </p>
         </div>
       `;

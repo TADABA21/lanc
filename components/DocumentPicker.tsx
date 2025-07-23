@@ -163,7 +163,9 @@ export function DocumentPickerComponent({
   const uploadSelectedFiles = async (filesToUpload: SelectedFile[]) => {
     if (!onFilesUploaded) return;
 
+    console.log('📤 Starting upload for files:', filesToUpload.map(f => f.name));
     setUploading(true);
+    
     try {
       const uploadedFiles = await uploadFiles(
         filesToUpload.map(file => ({
@@ -179,14 +181,21 @@ export function DocumentPickerComponent({
             // Update progress for individual files
             setUploadProgress(prev => ({
               ...prev,
-              [filesToUpload[0].name]: progress.percentage,
+              [filesToUpload[0]?.name || 'file']: progress.percentage,
             }));
           },
         }
       );
 
+      console.log('✅ Files uploaded successfully:', uploadedFiles);
       onFilesUploaded(uploadedFiles);
-      Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully!`);
+      
+      // Clear selected files after successful upload
+      setSelectedFiles([]);
+      if (storageKey) {
+        await AsyncStorage.removeItem(storageKey);
+      }
+      
     } catch (error) {
       console.error('Error uploading files:', error);
       Alert.alert('Upload Error', `Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`);
