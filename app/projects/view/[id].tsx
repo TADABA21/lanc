@@ -702,9 +702,9 @@ export default function ProjectDetailScreen() {
       // Map database fields to your ProjectFile interface
       const projectFiles: ProjectFile[] = (data || []).map(file => ({
         id: file.id,
-        name: file.filename,  // matches database schema
-        size: file.file_size,
-        type: file.filetype,  // matches database schema
+        name: file.file_name,  // correct field name from database
+        size: file.file_size || 0,
+        type: file.file_type || 'unknown',  // correct field name from database
         url: file.file_url,
         uploaded_at: file.created_at
       }));
@@ -832,15 +832,14 @@ export default function ProjectDetailScreen() {
   };
   const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
     try {
-      // Save file records to database with correct field names
+      // Save file records to database with correct field names from schema
       const fileRecords = uploadedFiles.map(file => ({
         project_id: id,
-        filename: file.name,  // matches database schema
+        file_name: file.name,  // correct field name from database schema
         file_size: file.size,
-        filetype: file.type,  // matches database schema
+        file_type: file.type,  // correct field name from database schema
         file_url: file.url,
         uploaded_by: user?.id,
-        created_at: new Date().toISOString(),
       }));
 
       const { data: insertedFiles, error } = await supabase
@@ -850,17 +849,8 @@ export default function ProjectDetailScreen() {
 
       if (error) throw error;
 
-      // Update local state with the actual database records
-      const newFiles: ProjectFile[] = (insertedFiles || []).map(file => ({
-        id: file.id,
-        name: file.filename,  // matches database schema
-        size: file.file_size,
-        type: file.filetype,  // matches database schema
-        url: file.file_url,
-        uploaded_at: file.created_at,
-      }));
-
-      setFiles(prev => [...prev, ...newFiles]);
+      // Refresh the files list from database to ensure consistency
+      await fetchFiles();
 
       // Create activity log
       await supabase
