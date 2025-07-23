@@ -37,7 +37,7 @@ export default function ClientsScreen() {
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<{id: string, name: string} | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<{ id: string, name: string } | null>(null);
 
   const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
 
@@ -116,21 +116,21 @@ export default function ClientsScreen() {
           .update({ client_id: null })
           .eq('client_id', clientToDelete.id)
           .eq('user_id', user.id),
-        
+
         // Update invoices to remove client reference
         supabase
           .from('invoices')
           .update({ client_id: null })
           .eq('client_id', clientToDelete.id)
           .eq('user_id', user.id),
-        
+
         // Update contracts to remove client reference
         supabase
           .from('contracts')
           .update({ client_id: null })
           .eq('client_id', clientToDelete.id)
           .eq('user_id', user.id),
-        
+
         // Update testimonials to remove client reference
         supabase
           .from('testimonials')
@@ -138,9 +138,9 @@ export default function ClientsScreen() {
           .eq('client_id', clientToDelete.id)
           .eq('user_id', user.id),
       ];
-      
+
       await Promise.all(updatePromises);
-      
+
       // Now delete the client
       const { error: clientError } = await supabase
         .from('clients')
@@ -217,19 +217,19 @@ export default function ClientsScreen() {
           )}
         </View>
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleViewClient(client.id)}
           >
             <Text style={styles.actionButtonText}>View</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleEditClient(client.id)}
           >
             <Edit size={16} color={colors.warning} />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => confirmDeleteClient(client.id, client.name)}
           >
@@ -254,11 +254,20 @@ export default function ClientsScreen() {
       </View>
 
       <View style={styles.clientActions}>
-        <TouchableOpacity style={styles.primaryActionButton}>
+        <TouchableOpacity
+          style={styles.primaryActionButton}
+          onPress={() => router.push({
+            pathname: '/email/ai-compose',
+            params: {
+              to: client.email || '',
+              clientName: client.name
+            }
+          })}
+        >
           <Mail size={16} color={colors.primary} />
           <Text style={styles.primaryActionButtonText}>Email</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.secondaryActionButton}
           onPress={() => handleViewProjects(client.id, client.name)}
         >
@@ -270,7 +279,7 @@ export default function ClientsScreen() {
   );
 
   const ProjectItem = ({ project }: { project: Project }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.projectItem}
       onPress={() => handleProjectPress(project.id)}
     >
@@ -704,7 +713,7 @@ export default function ClientsScreen() {
             <Users size={64} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No clients found</Text>
             <Text style={styles.emptyDescription}>
-              {searchQuery 
+              {searchQuery
                 ? 'Try adjusting your search terms'
                 : 'Add your first client to get started'
               }
@@ -731,14 +740,14 @@ export default function ClientsScreen() {
               <Text style={styles.modalTitle}>
                 Projects for {selectedClientName}
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowProjectsModal(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.projectsList}>
               {selectedClientProjects.length > 0 ? (
                 selectedClientProjects.map((project) => (
@@ -764,34 +773,34 @@ export default function ClientsScreen() {
         visible={deleteModalVisible}
         onRequestClose={() => setDeleteModalVisible(false)}
       >
-        <Pressable 
+        <Pressable
           style={styles.deleteModalContainer}
           onPress={() => setDeleteModalVisible(false)}
         >
           <Pressable style={styles.deleteModalContent}>
             <View style={styles.deleteModalHeader}>
               <Text style={styles.deleteModalTitle}>Delete Client</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.deleteModalCloseButton}
                 onPress={() => setDeleteModalVisible(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.deleteModalMessage}>
               Are you sure you want to delete "{clientToDelete?.name}"? This action cannot be undone.
             </Text>
-            
+
             <View style={styles.deleteModalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.deleteModalButton, styles.deleteModalCancelButton]}
                 onPress={() => setDeleteModalVisible(false)}
               >
                 <Text style={[styles.deleteModalButtonText, styles.deleteModalCancelButtonText]}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.deleteModalButton, styles.deleteModalDeleteButton]}
                 onPress={handleDeleteClient}
               >

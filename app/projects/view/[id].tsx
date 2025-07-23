@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   TextInput,
+
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,13 +18,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { supabase } from '@/lib/supabase';
 import { Project, Client, TeamMember, Activity } from '@/types/database';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  DollarSign, 
-  Users, 
-  FileText, 
-  Clock, 
+import {
+  ArrowLeft,
+  Calendar,
+  DollarSign,
+  Users,
+  FileText,
+  Clock,
   CheckSquare,
   Upload,
   Plus,
@@ -45,7 +46,9 @@ import { StatusDropdown } from '@/components/StatusDropdown';
 import { TimerWidget } from '@/components/TimerWidget';
 import { DocumentPickerComponent } from '@/components/DocumentPicker';
 import { UploadedFile } from '@/lib/fileUpload';
-
+import * as FileSystem from 'expo-file-system';
+import * as Linking from 'expo-linking';
+import { FlatList } from 'react-native';
 type ProjectWithRelations = Project & {
   client?: Client;
   project_members?: Array<{ team_member: TeamMember }>;
@@ -83,7 +86,7 @@ export default function ProjectDetailScreen() {
   const { shouldShowSidebar } = useSidebar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
+
   const [project, setProject] = useState<ProjectWithRelations | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -91,12 +94,12 @@ export default function ProjectDetailScreen() {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'files' | 'time' | 'tasks'>('overview');
   const [loading, setLoading] = useState(true);
-  
+
   // Modal states
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  
+
   // Form states
   const [newTask, setNewTask] = useState({ title: '', description: '' });
   const [newTimeEntry, setNewTimeEntry] = useState({ description: '', duration: '', date: new Date().toISOString().split('T')[0] });
@@ -320,6 +323,7 @@ export default function ProjectDetailScreen() {
       fontFamily: 'Inter-Regular',
       textAlign: 'center',
       fontStyle: 'italic',
+      color: colors.textMuted,
     },
     uploadButton: {
       flexDirection: 'row',
@@ -329,6 +333,7 @@ export default function ProjectDetailScreen() {
       paddingHorizontal: 24,
       borderRadius: 12,
       marginBottom: 20,
+      backgroundColor: colors.primary,
     },
     uploadButtonText: {
       color: 'white',
@@ -336,16 +341,20 @@ export default function ProjectDetailScreen() {
       fontFamily: 'Inter-SemiBold',
       marginLeft: 8,
     },
+
     filesGrid: {
       flex: 1,
     },
     emptyFilesContainer: {
+      flex: 1,
       padding: 40,
       borderRadius: 12,
       borderWidth: 2,
       borderStyle: 'dashed',
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
     },
     addButton: {
       flexDirection: 'row',
@@ -546,6 +555,37 @@ export default function ProjectDetailScreen() {
     modalButtonTextSecondary: {
       color: colors.textSecondary,
     },
+
+    fileItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      marginBottom: 12,
+    },
+    fileName: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      marginBottom: 4,
+    },
+    fileSize: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+    },
+    fileDate: {
+      fontSize: 12,
+      fontFamily: 'Inter-Regular',
+      marginTop: 4,
+    },
+    deleteButton: {
+      padding: 8,
+      borderRadius: 6,
+      marginLeft: 12,
+    },
+
+
+
   });
 
   useEffect(() => {
@@ -645,8 +685,34 @@ export default function ProjectDetailScreen() {
   };
 
   const fetchFiles = async () => {
-    // Mock data for now - in a real app, you'd fetch from a project_files table
-    setFiles([]);
+    if (!user || !id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_files')
+        .select('*')
+        .eq('project_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching files:', error);
+        return;
+      }
+
+      // Map database fields to your ProjectFile interface
+      const projectFiles: ProjectFile[] = (data || []).map(file => ({
+        id: file.id,
+        name: file.filename,  // matches database schema
+        size: file.file_size,
+        type: file.filetype,  // matches database schema
+        url: file.file_url,
+        uploaded_at: file.created_at
+      }));
+
+      setFiles(projectFiles);
+    } catch (error) {
+      console.error('Error fetching project files:', error);
+    }
   };
 
   const updateProjectStatus = async (newStatus: 'todo' | 'in_progress' | 'completed') => {
@@ -662,7 +728,7 @@ export default function ProjectDetailScreen() {
       if (error) throw error;
 
       setProject(prev => prev ? { ...prev, status: newStatus } : null);
-      
+
       // Create activity log
       await supabase
         .from('activities')
@@ -722,7 +788,7 @@ export default function ProjectDetailScreen() {
   };
 
   const toggleTask = (taskId: string) => {
-    setTasks(prev => prev.map(task => 
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     ));
   };
@@ -764,35 +830,36 @@ export default function ProjectDetailScreen() {
       Alert.alert('Error', 'Failed to upload files');
     }
   };
-
   const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
     try {
-      // Save file records to database
+      // Save file records to database with correct field names
       const fileRecords = uploadedFiles.map(file => ({
         project_id: id,
-        file_name: file.name,
+        filename: file.name,  // matches database schema
         file_size: file.size,
-        file_type: file.type,
+        filetype: file.type,  // matches database schema
         file_url: file.url,
         uploaded_by: user?.id,
+        created_at: new Date().toISOString(),
       }));
 
-      const { error } = await supabase
+      const { data: insertedFiles, error } = await supabase
         .from('project_files')
-        .insert(fileRecords);
+        .insert(fileRecords)
+        .select();
 
       if (error) throw error;
 
-      // Update local state
-      const newFiles = uploadedFiles.map(file => ({
+      // Update local state with the actual database records
+      const newFiles: ProjectFile[] = (insertedFiles || []).map(file => ({
         id: file.id,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: file.url,
-        uploaded_at: new Date().toISOString(),
+        name: file.filename,  // matches database schema
+        size: file.file_size,
+        type: file.filetype,  // matches database schema
+        url: file.file_url,
+        uploaded_at: file.created_at,
       }));
-      
+
       setFiles(prev => [...prev, ...newFiles]);
 
       // Create activity log
@@ -830,7 +897,7 @@ export default function ProjectDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: colors.text }]}>Project not found</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
@@ -841,11 +908,11 @@ export default function ProjectDetailScreen() {
     );
   }
 
-  const StatsCard = ({ icon: Icon, label, value, color }: { 
-    icon: any, 
-    label: string, 
-    value: string, 
-    color: string 
+  const StatsCard = ({ icon: Icon, label, value, color }: {
+    icon: any,
+    label: string,
+    value: string,
+    color: string
   }) => (
     <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
@@ -856,10 +923,10 @@ export default function ProjectDetailScreen() {
     </View>
   );
 
-  const TabButton = ({ tab, label, isActive }: { 
-    tab: typeof activeTab, 
-    label: string, 
-    isActive: boolean 
+  const TabButton = ({ tab, label, isActive }: {
+    tab: typeof activeTab,
+    label: string,
+    isActive: boolean
   }) => (
     <TouchableOpacity
       style={[
@@ -892,14 +959,14 @@ export default function ProjectDetailScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Progress</Text>
         <View style={styles.progressContainer}>
           <View style={[styles.progressBar, { backgroundColor: colors.borderLight }]}>
-            <View 
+            <View
               style={[
-                styles.progressFill, 
-                { 
+                styles.progressFill,
+                {
                   width: `${project.progress}%`,
                   backgroundColor: getStatusColor(project.status)
                 }
-              ]} 
+              ]}
             />
           </View>
           <Text style={[styles.progressText, { color: colors.text }]}>{project.progress}%</Text>
@@ -964,46 +1031,166 @@ export default function ProjectDetailScreen() {
     </View>
   );
 
-  const FilesTab = () => (
-    <View style={styles.tabContent}>
-      <TouchableOpacity 
-        style={[styles.uploadButton, { backgroundColor: colors.primary }]}
-        onPress={() => setShowUploadModal(true)}
-      >
-        <Upload size={20} color="white" />
-        <Text style={styles.uploadButtonText}>Upload Files</Text>
-      </TouchableOpacity>
-      
-      <View style={styles.filesGrid}>
-        {files.length > 0 ? (
-          files.map((file) => (
-            <View key={file.id} style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{file.name}</Text>
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
-                {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type}
+  const FilesTab = () => {
+    const handlePreviewFile = async (file: ProjectFile) => {
+      try {
+        const canOpen = await Linking.canOpenURL(file.url);
+        if (canOpen) {
+          await Linking.openURL(file.url);
+        } else {
+          Alert.alert('Preview not available', 'This file type cannot be previewed directly');
+        }
+      } catch (error) {
+        console.error('Error opening file:', error);
+        Alert.alert('Error', 'Could not open file');
+      }
+    };
+
+    const handleDeleteFile = async (fileId: string, fileUrl: string) => {
+      try {
+        // Extract the file path from the URL
+        const urlParts = fileUrl.split('/');
+        const bucketIndex = urlParts.findIndex(part => part === 'project-files');
+        let filePath = '';
+
+        if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+          filePath = urlParts.slice(bucketIndex + 1).join('/');
+        }
+
+        // Delete from storage if we have a valid path
+        if (filePath) {
+          const { error: storageError } = await supabase.storage
+            .from('project-files')
+            .remove([filePath]);
+
+          if (storageError) {
+            console.warn('Error deleting from storage:', storageError);
+            // Still try to delete from database
+          }
+        }
+
+        // Delete from database
+        const { error: dbError } = await supabase
+          .from('project_files')
+          .delete()
+          .eq('id', fileId);
+
+        if (dbError) throw dbError;
+
+        // Update UI
+        setFiles(prev => prev.filter(f => f.id !== fileId));
+
+        // Create activity log
+        await supabase
+          .from('activities')
+          .insert([{
+            type: 'file_deleted',
+            title: 'File deleted from project',
+            description: `File deleted from project: ${project?.name}`,
+            entity_type: 'project',
+            entity_id: id,
+            user_id: user?.id,
+          }]);
+
+        await fetchActivities();
+        Alert.alert('Success', 'File deleted successfully');
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        Alert.alert('Error', 'Failed to delete file');
+      }
+    };
+
+    return (
+      <View style={styles.tabContent}>
+        <TouchableOpacity
+          style={[styles.uploadButton, { backgroundColor: colors.primary }]}
+          onPress={() => setShowUploadModal(true)}
+        >
+          <Upload size={20} color="white" />
+          <Text style={[styles.uploadButtonText, { color: 'white' }]}>Upload Files</Text>
+        </TouchableOpacity>
+
+        <FlatList
+          data={files}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={files.length === 0 ? { flex: 1 } : {}}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.fileItem,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border
+                }
+              ]}
+              onPress={() => handlePreviewFile(item)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <FileText size={20} color={colors.primary} style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.fileSize, { color: colors.textSecondary }]}>
+                    {(item.size / 1024 / 1024).toFixed(2)} MB • {item.type}
+                  </Text>
+                  <Text style={[styles.fileDate, { color: colors.textMuted }]}>
+                    Uploaded {formatDistanceToNow(new Date(item.uploaded_at))} ago
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent triggering the preview
+                  Alert.alert(
+                    'Delete File',
+                    `Are you sure you want to delete "${item.name}"?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => handleDeleteFile(item.id, item.url)
+                      }
+                    ]
+                  );
+                }}
+                style={[styles.deleteButton, { backgroundColor: colors.error }]}
+              >
+                <Trash2 size={16} color="white" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={[
+              styles.emptyFilesContainer,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border
+              }
+            ]}>
+              <FileText size={48} color={colors.textMuted} />
+              <Text style={[styles.emptyText, { color: colors.textMuted, marginTop: 16 }]}>
+                No files uploaded yet
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                Tap the upload button to add files
               </Text>
             </View>
-          ))
-        ) : (
-          <View style={[styles.emptyFilesContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <FileText size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              No files uploaded yet
-            </Text>
-          </View>
-        )}
+          }
+        />
       </View>
-    </View>
-  );
+    );
+  };
 
   const TimeTab = () => (
     <View style={styles.tabContent}>
-      <TimerWidget 
+      <TimerWidget
         onTimeEntryComplete={handleTimeEntryComplete}
         projectName={project.name}
       />
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.addButton, { backgroundColor: colors.primary }]}
         onPress={() => setShowAddTimeModal(true)}
       >
@@ -1040,7 +1227,7 @@ export default function ProjectDetailScreen() {
 
   const TasksTab = () => (
     <View style={styles.tabContent}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.addButton, { backgroundColor: colors.primary }]}
         onPress={() => setShowAddTaskModal(true)}
       >
@@ -1053,7 +1240,7 @@ export default function ProjectDetailScreen() {
         {tasks.length > 0 ? (
           tasks.map((task) => (
             <View key={task.id} style={[styles.taskItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.taskCheckbox}
                 onPress={() => toggleTask(task.id)}
               >
@@ -1065,8 +1252,8 @@ export default function ProjectDetailScreen() {
               </TouchableOpacity>
               <View style={styles.taskContent}>
                 <Text style={[
-                  styles.taskTitle, 
-                  { 
+                  styles.taskTitle,
+                  {
                     color: task.completed ? colors.textMuted : colors.text,
                     textDecorationLine: task.completed ? 'line-through' : 'none'
                   }
@@ -1080,7 +1267,7 @@ export default function ProjectDetailScreen() {
                 )}
               </View>
               <View style={styles.taskActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.taskActionButton}
                   onPress={() => deleteTask(task.id)}
                 >
@@ -1122,23 +1309,23 @@ export default function ProjectDetailScreen() {
 
       {/* Stats */}
       <View style={styles.statsContainer}>
-        <StatsCard 
-          icon={DollarSign} 
-          label="Budget" 
-          value={formatCurrency(project.budget || 0)} 
-          color="#10B981" 
+        <StatsCard
+          icon={DollarSign}
+          label="Budget"
+          value={formatCurrency(project.budget || 0)}
+          color="#10B981"
         />
-        <StatsCard 
-          icon={TrendingUp} 
-          label="Progress" 
-          value={`${project.progress}%`} 
-          color="#3B82F6" 
+        <StatsCard
+          icon={TrendingUp}
+          label="Progress"
+          value={`${project.progress}%`}
+          color="#3B82F6"
         />
-        <StatsCard 
-          icon={Calendar} 
-          label="Due Date" 
-          value={project.end_date ? new Date(project.end_date).toLocaleDateString() : 'Not set'} 
-          color="#F59E0B" 
+        <StatsCard
+          icon={Calendar}
+          label="Due Date"
+          value={project.end_date ? new Date(project.end_date).toLocaleDateString() : 'Not set'}
+          color="#F59E0B"
         />
       </View>
 
@@ -1160,7 +1347,7 @@ export default function ProjectDetailScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.primaryActionButton]}
           onPress={handleCreateInvoice}
         >
@@ -1169,7 +1356,7 @@ export default function ProjectDetailScreen() {
             Create Invoice
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.secondaryActionButton]}
           onPress={handleCreateContract}
         >
@@ -1191,14 +1378,14 @@ export default function ProjectDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add New Task</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowAddTaskModal(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Task Title *</Text>
               <TextInput
@@ -1256,14 +1443,14 @@ export default function ProjectDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Time Entry</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowAddTimeModal(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Description *</Text>
               <TextInput
@@ -1320,6 +1507,7 @@ export default function ProjectDetailScreen() {
         </View>
       </Modal>
 
+
       {/* Upload Modal */}
       <Modal
         visible={showUploadModal}
@@ -1331,25 +1519,55 @@ export default function ProjectDetailScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Upload Files</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowUploadModal(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={[styles.description, { color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }]}>
-              Select files to upload to this project. Supported formats include documents, images, and other file types.
+              Select files to upload to this project. Max 10 files at once.
             </Text>
 
             <DocumentPickerComponent
-              onFilesSelected={handleFilesSelected}
-              onFilesUploaded={handleFilesUploaded}
+              onFilesSelected={(selectedFiles) => {
+                console.log('Files selected:', selectedFiles);
+              }}
+              onFilesUploaded={(uploadedFiles) => {
+                // Add the uploaded files to state
+                const newFiles = uploadedFiles.map(file => ({
+                  id: file.id,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  url: file.url,
+                  uploaded_at: new Date().toISOString(),
+                }));
+
+                setFiles(prev => [...prev, ...newFiles]);
+
+                // Create activity log
+                if (user && id) {
+                  supabase
+                    .from('activities')
+                    .insert([{
+                      type: 'files_uploaded',
+                      title: `${uploadedFiles.length} file(s) uploaded`,
+                      description: `Files: ${uploadedFiles.map(f => f.name).join(', ')}`,
+                      entity_type: 'project',
+                      entity_id: id,
+                      user_id: user.id,
+                    }])
+                    .then(() => fetchActivities());
+                }
+
+                Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully!`);
+                setShowUploadModal(false);
+              }}
               maxFiles={10}
-              label=""
-              placeholder="Select files to upload"
-              storageKey={`project_files_${id}`}
+              allowedTypes={['application/pdf', 'image/*', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.*']}
               autoUpload={true}
               uploadBucket="project-files"
               uploadFolder={`projects/${id}`}
@@ -1362,14 +1580,6 @@ export default function ProjectDetailScreen() {
               >
                 <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
                   Cancel
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={() => setShowUploadModal(false)}
-              >
-                <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                  Done
                 </Text>
               </TouchableOpacity>
             </View>

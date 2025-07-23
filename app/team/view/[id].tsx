@@ -16,7 +16,23 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { supabase } from '@/lib/supabase';
 import { Employee, Project, Activity } from '@/types/database';
-import { ArrowLeft, Mail, Phone, Calendar, DollarSign, Briefcase, User, MapPin, Clock, TrendingUp, FolderOpen, Award, ExternalLink, CreditCard as Edit, MessageSquare } from 'lucide-react-native';
+import { 
+  ArrowLeft, 
+  Mail, 
+  Phone, 
+  Calendar, 
+  DollarSign, 
+  Briefcase, 
+  User, 
+  MapPin, 
+  Clock, 
+  TrendingUp, 
+  FolderOpen, 
+  Award, 
+  ExternalLink, 
+  Edit, 
+  MessageSquare 
+} from 'lucide-react-native';
 import { formatCurrency, formatDistanceToNow, getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusDropdown } from '@/components/StatusDropdown';
@@ -35,12 +51,12 @@ export default function TeamMemberDetailScreen() {
   const { shouldShowSidebar } = useSidebar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
+
   const [employee, setEmployee] = useState<EmployeeWithStats | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
+  const isMobile = Platform.OS !== 'web' || (Platform.OS === 'web' && window.innerWidth < 768);
 
   // Team member status options
   const teamStatusOptions = [
@@ -48,6 +64,278 @@ export default function TeamMemberDetailScreen() {
     { value: 'on_leave', label: 'On Leave', color: '#F59E0B' },
     { value: 'terminated', label: 'Terminated', color: '#EF4444' },
   ];
+
+  useEffect(() => {
+    if (id) {
+      fetchEmployeeDetails();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (employee) {
+      fetchActivities();
+    }
+  }, [employee]);
+
+  const fetchEmployeeDetails = async () => {
+    if (!user || !id) return;
+
+    try {
+      // Fetch employee details
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (employeeError) throw employeeError;
+
+      // Fetch employee's projects through project_members
+      const { data: projectMembersData, error: projectMembersError } = await supabase
+        .from('project_members')
+        .select(`
+          project:projects(*)
+        `)
+        .eq('team_member_id', id);
+
+      if (projectMembersError) throw projectMembersError;
+
+      // Add type assertion here
+      const projects = (projectMembersData?.map(pm => pm.project).filter(Boolean) as unknown as Project[]);
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter(p => p.status === 'in_progress').length;
+      const completedProjects = projects.filter(p => p.status === 'completed').length;
+
+      setEmployee({
+        ...employeeData,
+        projects,
+        totalProjects,
+        activeProjects,
+        completedProjects,
+      });
+    } catch (error) {
+      console.error('Error fetching employee:', error);
+      Alert.alert('Error', 'Failed to load team member details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchActivities = async () => {
+    if (!user || !id || !employee) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .or(`entity_id.eq.${id},description.ilike.%${employee.name}%`)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setActivities(data || []);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+    }
+  };
+
+  const updateEmployeeStatus = async (newStatus: 'active' | 'on_leave' | 'terminated') => {
+    if (!employee || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ status: newStatus })
+        .eq('id', employee.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setEmployee(prev => prev ? { ...prev, status: newStatus } : null);
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'team_member_updated',
+          title: `Team member status changed to ${newStatus.replace('_', ' ')}`,
+          description: `Status updated for team member: ${employee.name}`,
+          entity_type: 'team_member',
+          entity_id: employee.id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      Alert.alert('Success', `Team member status updated to ${newStatus.replace('_', ' ')}`);
+    } catch (error) {
+      console.error('Error updating team member status:', error);
+      Alert.alert('Error', 'Failed to update team member status');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!employee?.email) {
+      Alert.alert('No Email', 'This team member does not have an email address on file.');
+      return;
+    }
+
+    try {
+      // Always use AI email composer with pre-filled data
+      const params = new URLSearchParams({
+        to: employee.email,
+        employeeName: employee.name,
+        ...(employee.role && { employeeRole: employee.role }),
+        ...(employee.department && { employeeDepartment: employee.department }),
+      });
+      router.push(`/email/ai-compose?${params.toString()}`);
+    } catch (error) {
+      console.error('Error opening email:', error);
+      // Fallback to basic compose
+      router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
+    }
+  };
+
+  const handleCallEmployee = async () => {
+    if (!employee?.phone) {
+      Alert.alert('No Phone', 'This team member does not have a phone number on file.');
+      return;
+    }
+
+    try {
+      const phoneUrl = `tel:${employee.phone}`;
+      const canOpen = await Linking.canOpenURL(phoneUrl);
+
+      if (canOpen) {
+        await Linking.openURL(phoneUrl);
+      } else {
+        Alert.alert('Cannot Call', 'Unable to make phone calls on this device.');
+      }
+    } catch (error) {
+      console.error('Error making call:', error);
+      Alert.alert('Error', 'Failed to initiate call');
+    }
+  };
+
+  const handleEditEmployee = () => {
+    router.push(`/team/edit/${id}`);
+  };
+
+  const handleSendMessage = () => {
+    if (!employee?.email) {
+      Alert.alert('No Email', 'This team member does not have an email address on file.');
+      return;
+    }
+    router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
+  };
+
+  const getYearsOfService = () => {
+    if (!employee || !employee.hire_date) return 'N/A';
+    const hireDate = new Date(employee.hire_date);
+    const now = new Date();
+    const years = now.getFullYear() - hireDate.getFullYear();
+    const months = now.getMonth() - hireDate.getMonth();
+
+    if (years === 0) {
+      return `${months} month${months !== 1 ? 's' : ''}`;
+    }
+    return `${years} year${years !== 1 ? 's' : ''}`;
+  };
+
+  // Component definitions
+  const InfoItem = ({ icon: Icon, label, value, onPress }: {
+    icon: any;
+    label: string;
+    value: string;
+    onPress?: () => void;
+  }) => (
+    <TouchableOpacity
+      style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}15` }]}>
+        <Icon size={20} color={colors.primary} />
+      </View>
+      <View style={styles.infoContent}>
+        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
+      </View>
+      {onPress && <ExternalLink size={16} color={colors.textMuted} />}
+    </TouchableOpacity>
+  );
+
+  const StatCard = ({ icon: Icon, label, value, color }: {
+    icon: any;
+    label: string;
+    value: string | number;
+    color: string;
+  }) => (
+    <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
+        <Icon size={24} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+    </View>
+  );
+
+  const ProjectItem = ({ project }: { project: Project }) => (
+    <TouchableOpacity
+      style={[styles.projectItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => router.push(`/projects/view/${project.id}`)}
+    >
+      <View style={styles.projectHeader}>
+        <Text style={[styles.projectName, { color: colors.text }]}>{project.name}</Text>
+        <View style={[styles.projectStatus, { backgroundColor: getStatusColor(project.status) }]}>
+          <Text style={styles.projectStatusText}>
+            {project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ')}
+          </Text>
+        </View>
+      </View>
+      {project.description && (
+        <Text style={[styles.projectDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+          {project.description}
+        </Text>
+      )}
+      <View style={styles.projectProgress}>
+        <View style={[styles.progressBar, { backgroundColor: colors.borderLight }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${project.progress}%`,
+                backgroundColor: getStatusColor(project.status)
+              }
+            ]}
+          />
+        </View>
+        <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+          {project.progress}%
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const ActivityItem = ({ activity }: { activity: Activity }) => (
+    <View style={styles.activityItem}>
+      <View style={[styles.activityDot, { backgroundColor: colors.primary }]} />
+      <View style={styles.activityContent}>
+        <Text style={[styles.activityTitle, { color: colors.text }]}>
+          {activity.title}
+        </Text>
+        {activity.description && (
+          <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
+            {activity.description}
+          </Text>
+        )}
+        <Text style={[styles.activityTime, { color: colors.textMuted }]}>
+          {formatDistanceToNow(new Date(activity.created_at))}
+        </Text>
+      </View>
+    </View>
+  );
 
   const styles = StyleSheet.create({
     container: {
@@ -363,161 +651,6 @@ export default function TeamMemberDetailScreen() {
     },
   });
 
-  useEffect(() => {
-    if (id) {
-      fetchEmployeeDetails();
-      fetchActivities();
-    }
-  }, [id]);
-
-  const fetchEmployeeDetails = async () => {
-    if (!user || !id) return;
-
-    try {
-      // Fetch employee details
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (employeeError) throw employeeError;
-
-      // Fetch employee's projects through project_members
-      const { data: projectMembersData, error: projectMembersError } = await supabase
-        .from('project_members')
-        .select(`
-          project:projects(*)
-        `)
-        .eq('team_member_id', id);
-
-      if (projectMembersError) throw projectMembersError;
-
-      const projects = projectMembersData?.map(pm => pm.project).filter(Boolean) || [];
-      const totalProjects = projects.length;
-      const activeProjects = projects.filter(p => p.status === 'in_progress').length;
-      const completedProjects = projects.filter(p => p.status === 'completed').length;
-
-      setEmployee({
-        ...employeeData,
-        projects,
-        totalProjects,
-        activeProjects,
-        completedProjects,
-      });
-    } catch (error) {
-      console.error('Error fetching employee:', error);
-      Alert.alert('Error', 'Failed to load team member details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchActivities = async () => {
-    if (!user || !id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('activities')
-        .select('*')
-        .or(`entity_id.eq.${id},description.ilike.%${employee?.name}%`)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setActivities(data || []);
-    } catch (error) {
-      console.error('Error fetching activities:', error);
-    }
-  };
-
-  const updateEmployeeStatus = async (newStatus: 'active' | 'on_leave' | 'terminated') => {
-    if (!employee || !user) return;
-
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .update({ status: newStatus })
-        .eq('id', employee.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setEmployee(prev => prev ? { ...prev, status: newStatus } : null);
-      
-      // Create activity log
-      await supabase
-        .from('activities')
-        .insert([{
-          type: 'team_member_updated',
-          title: `Team member status changed to ${newStatus.replace('_', ' ')}`,
-          description: `Status updated for team member: ${employee.name}`,
-          entity_type: 'team_member',
-          entity_id: employee.id,
-          user_id: user.id,
-        }]);
-
-      await fetchActivities();
-      Alert.alert('Success', `Team member status updated to ${newStatus.replace('_', ' ')}`);
-    } catch (error) {
-      console.error('Error updating team member status:', error);
-      Alert.alert('Error', 'Failed to update team member status');
-    }
-  };
-
-  const handleSendEmail = async () => {
-    if (!employee?.email) {
-      Alert.alert('No Email', 'This team member does not have an email address on file.');
-      return;
-    }
-
-    try {
-      // Always use AI email composer with pre-filled data
-      const params = new URLSearchParams({
-        to: employee.email,
-        employeeName: employee.name,
-        ...(employee.role && { employeeRole: employee.role }),
-        ...(employee.department && { employeeDepartment: employee.department }),
-      });
-      router.push(`/email/ai-compose?${params.toString()}`);
-    } catch (error) {
-      console.error('Error opening email:', error);
-      // Fallback to basic compose
-      router.push(`/email/ai-compose?to=${employee.email}&employeeName=${employee.name}`);
-    }
-  };
-
-  const handleCallEmployee = async () => {
-    if (!employee?.phone) {
-      Alert.alert('No Phone', 'This team member does not have a phone number on file.');
-      return;
-    }
-
-    try {
-      const phoneUrl = `tel:${employee.phone}`;
-      const canOpen = await Linking.canOpenURL(phoneUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(phoneUrl);
-      } else {
-        Alert.alert('Cannot Call', 'Unable to make phone calls on this device.');
-      }
-    } catch (error) {
-      console.error('Error making call:', error);
-      Alert.alert('Error', 'Failed to initiate call');
-    }
-  };
-
-  const handleEditEmployee = () => {
-    router.push(`/team/edit/${id}`);
-  };
-
-  const handleSendMessage = () => {
-    router.push(`/email/ai-compose?to=${employee?.email}&employeeName=${employee?.name}`);
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -533,7 +666,7 @@ export default function TeamMemberDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: colors.text }]}>Team member not found</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
@@ -543,112 +676,6 @@ export default function TeamMemberDetailScreen() {
       </SafeAreaView>
     );
   }
-
-  const InfoItem = ({ icon: Icon, label, value, onPress }: {
-    icon: any;
-    label: string;
-    value: string;
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity 
-      style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}15` }]}>
-        <Icon size={20} color={colors.primary} />
-      </View>
-      <View style={styles.infoContent}>
-        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
-        <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
-      </View>
-      {onPress && <ExternalLink size={16} color={colors.textMuted} />}
-    </TouchableOpacity>
-  );
-
-  const StatCard = ({ icon: Icon, label, value, color }: {
-    icon: any;
-    label: string;
-    value: string | number;
-    color: string;
-  }) => (
-    <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
-        <Icon size={24} color={color} />
-      </View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
-    </View>
-  );
-
-  const ProjectItem = ({ project }: { project: Project }) => (
-    <TouchableOpacity 
-      style={[styles.projectItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => router.push(`/projects/view/${project.id}`)}
-    >
-      <View style={styles.projectHeader}>
-        <Text style={[styles.projectName, { color: colors.text }]}>{project.name}</Text>
-        <View style={[styles.projectStatus, { backgroundColor: getStatusColor(project.status) }]}>
-          <Text style={styles.projectStatusText}>
-            {project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ')}
-          </Text>
-        </View>
-      </View>
-      {project.description && (
-        <Text style={[styles.projectDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-          {project.description}
-        </Text>
-      )}
-      <View style={styles.projectProgress}>
-        <View style={[styles.progressBar, { backgroundColor: colors.borderLight }]}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                width: `${project.progress}%`,
-                backgroundColor: getStatusColor(project.status)
-              }
-            ]} 
-          />
-        </View>
-        <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-          {project.progress}%
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const ActivityItem = ({ activity }: { activity: Activity }) => (
-    <View style={styles.activityItem}>
-      <View style={[styles.activityDot, { backgroundColor: colors.primary }]} />
-      <View style={styles.activityContent}>
-        <Text style={[styles.activityTitle, { color: colors.text }]}>
-          {activity.title}
-        </Text>
-        {activity.description && (
-          <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
-            {activity.description}
-          </Text>
-        )}
-        <Text style={[styles.activityTime, { color: colors.textMuted }]}>
-          {formatDistanceToNow(new Date(activity.created_at))}
-        </Text>
-      </View>
-    </View>
-  );
-
-  const getYearsOfService = () => {
-    if (!employee.hire_date) return 'N/A';
-    const hireDate = new Date(employee.hire_date);
-    const now = new Date();
-    const years = now.getFullYear() - hireDate.getFullYear();
-    const months = now.getMonth() - hireDate.getMonth();
-    
-    if (years === 0) {
-      return `${months} month${months !== 1 ? 's' : ''}`;
-    }
-    return `${years} year${years !== 1 ? 's' : ''}`;
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -666,7 +693,9 @@ export default function TeamMemberDetailScreen() {
         <StatusDropdown
           currentStatus={employee.status}
           options={teamStatusOptions}
-          onStatusChange={updateEmployeeStatus}
+          onStatusChange={(status: string) => {
+            updateEmployeeStatus(status as 'active' | 'on_leave' | 'terminated');
+          }}
         />
       </View>
 
@@ -678,7 +707,7 @@ export default function TeamMemberDetailScreen() {
             {employee.name.charAt(0).toUpperCase()}
           </Text>
         </View>
-        
+
         <Text style={styles.employeeTitle}>{employee.name}</Text>
         <Text style={styles.employeeRole}>{employee.role}</Text>
 
@@ -795,7 +824,7 @@ export default function TeamMemberDetailScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.primaryActionButton]}
           onPress={handleSendEmail}
         >
@@ -804,7 +833,7 @@ export default function TeamMemberDetailScreen() {
             Send Email
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.secondaryActionButton]}
           onPress={handleSendMessage}
         >

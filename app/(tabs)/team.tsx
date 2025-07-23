@@ -35,7 +35,7 @@ export default function TeamScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [employeeToDelete, setEmployeeToDelete] = useState<{id: string, name: string} | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<{ id: string, name: string } | null>(null);
 
   const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
 
@@ -90,11 +90,11 @@ export default function TeamScreen() {
         .from('project_members')
         .delete()
         .eq('team_member_id', employeeToDelete.id);
-      
+
       if (projectMembersError) {
         console.warn('Error removing project memberships:', projectMembersError);
       }
-      
+
       // Update project files to remove uploader reference
       await supabase
         .from('project_files')
@@ -138,8 +138,8 @@ export default function TeamScreen() {
 
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         employee.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         employee.role.toLowerCase().includes(searchQuery.toLowerCase());
+      employee.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      employee.role.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -179,13 +179,13 @@ export default function TeamScreen() {
           )}
         </View>
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleEditTeamMember(employee.id)}
           >
             <Edit size={16} color={colors.warning} />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => confirmDeleteTeamMember(employee.id, employee.name)}
           >
@@ -217,11 +217,20 @@ export default function TeamScreen() {
       </View>
 
       <View style={styles.employeeActions}>
-        <TouchableOpacity style={styles.primaryActionButton}>
+        <TouchableOpacity
+          style={styles.primaryActionButton}
+          onPress={() => router.push({
+            pathname: '/email/ai-compose',
+            params: {
+              to: employee.email || '',
+              clientName: employee.name
+            }
+          })}
+        >
           <Mail size={16} color={colors.primary} />
           <Text style={styles.primaryActionButtonText}>Email</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.secondaryActionButton}
           onPress={() => handleViewProfile(employee.id)}
         >
@@ -660,7 +669,7 @@ export default function TeamScreen() {
             <User size={64} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No team members found</Text>
             <Text style={styles.emptyDescription}>
-              {searchQuery || statusFilter !== 'all' 
+              {searchQuery || statusFilter !== 'all'
                 ? 'Try adjusting your search or filters'
                 : 'Add your first team member to get started'
               }
@@ -681,34 +690,34 @@ export default function TeamScreen() {
         visible={deleteModalVisible}
         onRequestClose={() => setDeleteModalVisible(false)}
       >
-        <Pressable 
+        <Pressable
           style={styles.modalContainer}
           onPress={() => setDeleteModalVisible(false)}
         >
           <Pressable style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Delete Team Member</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setDeleteModalVisible(false)}
               >
                 <X size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.modalMessage}>
               Are you sure you want to delete "{employeeToDelete?.name}"? This action cannot be undone.
             </Text>
-            
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setDeleteModalVisible(false)}
               >
                 <Text style={[styles.modalButtonText, styles.modalCancelButtonText]}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.modalButton, styles.modalDeleteButton]}
                 onPress={handleDeleteTeamMember}
               >

@@ -34,7 +34,7 @@ interface DocumentPickerProps {
   uploadFolder?: string;
 }
 
-export function DocumentPickerComponent({ 
+export function DocumentPickerComponent({
   onFilesSelected,
   onFilesUploaded,
   maxFiles = 5,
@@ -59,7 +59,7 @@ export function DocumentPickerComponent({
 
   const loadStoredFiles = async () => {
     if (!storageKey) return;
-    
+
     try {
       const storedFiles = await AsyncStorage.getItem(storageKey);
       if (storedFiles) {
@@ -74,7 +74,7 @@ export function DocumentPickerComponent({
 
   const saveFilesToStorage = async (files: SelectedFile[]) => {
     if (!storageKey) return;
-    
+
     try {
       await AsyncStorage.setItem(storageKey, JSON.stringify(files));
     } catch (error) {
@@ -101,14 +101,14 @@ export function DocumentPickerComponent({
   const pickFiles = async () => {
     try {
       let result;
-      
+
       if (Platform.OS === 'web') {
         // For web, use the file input approach
         const input = document.createElement('input');
         input.type = 'file';
         input.multiple = maxFiles > 1;
         input.accept = allowedTypes === '*/*' ? '*/*' : allowedTypes as string;
-        
+
         return new Promise((resolve) => {
           input.onchange = (event: any) => {
             const files = Array.from(event.target.files || []) as File[];
@@ -118,7 +118,7 @@ export function DocumentPickerComponent({
               size: file.size,
               mimeType: file.type,
             }));
-            
+
             handleNewFiles(newSelectedFiles);
             resolve(null);
           };
@@ -130,7 +130,7 @@ export function DocumentPickerComponent({
           multiple: maxFiles > 1,
           copyToCacheDirectory: true,
         });
-        
+
         if (!result.canceled) {
           const files = result.assets.map(asset => ({
             uri: asset.uri,
@@ -246,33 +246,45 @@ export function DocumentPickerComponent({
     filesList: {
       maxHeight: 200,
     },
-    fileItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
     fileIcon: {
       marginRight: 12,
     },
     fileInfo: {
       flex: 1,
     },
-    fileName: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      color: colors.text,
-      marginBottom: 2,
-    },
-    fileSize: {
-      fontSize: 12,
-      fontFamily: 'Inter-Regular',
-      color: colors.textMuted,
-    },
+   fileName: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
+    color: colors.text,
+  },
+   fileSize: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: colors.textSecondary,
+  },
+fileDate: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 4,
+    color: colors.textMuted,
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 6,
+    marginLeft: 12,
+    backgroundColor: colors.error,
+  },
     removeButton: {
       padding: 4,
       borderRadius: 4,
@@ -303,7 +315,7 @@ export function DocumentPickerComponent({
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      
+
       <TouchableOpacity
         style={[
           styles.uploadButton,
@@ -312,10 +324,10 @@ export function DocumentPickerComponent({
         onPress={pickFiles}
         disabled={uploading}
       >
-        <Upload 
+        <Upload
           size={20}
           color={uploading ? colors.warning : selectedFiles.length > 0 ? colors.primary : colors.textSecondary}
-          style={styles.uploadIcon} 
+          style={styles.uploadIcon}
         />
         <Text style={[
           styles.uploadText,
@@ -324,7 +336,7 @@ export function DocumentPickerComponent({
         ]}>
           {uploading
             ? 'Uploading files...'
-            : selectedFiles.length > 0 
+            : selectedFiles.length > 0
               ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} selected`
               : 'Tap to select files'
           }
@@ -350,11 +362,11 @@ export function DocumentPickerComponent({
                   </Text>
                   {uploadProgress[item.name] && (
                     <View style={styles.progressBar}>
-                      <View 
+                      <View
                         style={[
-                          styles.progressFill, 
+                          styles.progressFill,
                           { width: `${uploadProgress[item.name]}%` }
-                        ]} 
+                        ]}
                       />
                     </View>
                   )}
@@ -373,7 +385,7 @@ export function DocumentPickerComponent({
       ) : (
         <Text style={styles.placeholder}>{placeholder}</Text>
       )}
-      
+
       {autoUpload && !uploading && selectedFiles.length > 0 && (
         <TouchableOpacity
           style={[styles.uploadButton, { marginTop: 8, backgroundColor: colors.primary }]}
