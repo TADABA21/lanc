@@ -687,17 +687,15 @@ export default function ProjectDetailScreen() {
   const fetchFiles = async () => {
     if (!user || !id) return;
 
+    console.log('🔍 Fetching files for project:', id);
+    console.log('👤 User ID:', user.id);
+
     try {
       const { data, error } = await supabase
+    console.log('🗑️ Attempting to delete file:', { fileId, fileUrl });
+    
         .from('project_files')
-        .select('*')
-        .eq('project_id', id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching files:', error);
-        return;
-      }
+      console.log('📁 Raw files data from database:', data);
 
       // Map database fields to your ProjectFile interface
       const projectFiles: ProjectFile[] = (data || []).map(file => ({
@@ -709,6 +707,7 @@ export default function ProjectDetailScreen() {
         uploaded_at: file.created_at
       }));
 
+      console.log('✅ Mapped project files:', projectFiles);
       setFiles(projectFiles);
     } catch (error) {
       console.error('Error fetching project files:', error);
@@ -829,18 +828,52 @@ export default function ProjectDetailScreen() {
       console.error('Error handling files:', error);
       Alert.alert('Error', 'Failed to upload files');
     }
-  };
-  const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
-    try {
-      // Save file records to database with correct field names from schema
-      const fileRecords = uploadedFiles.map(file => ({
-        project_id: id,
-        file_name: file.name,  // correct field name from database schema
-        file_size: file.size,
-        file_type: file.type,  // correct field name from database schema
+      // First get the file record to get the correct path
+      const { data: fileRecord, error: fetchError } = await supabase
+        .from('project_files')
+        .select('file_url')
+        .eq('id', fileId)
+        .single();
+
+      if (fetchError) {
+        console.error('❌ Error fetching file record:', fetchError);
+      } else if (fileRecord) {
+        // Extract the file path from the URL for storage deletion
+        const url = fileRecord.file_url;
+        console.log('📄 File URL from database:', url);
+        
+        // Parse the URL to get the storage path
+        try {
+          const urlObj = new URL(url);
+          const pathParts = urlObj.pathname.split('/');
+          const storageIndex = pathParts.findIndex(part => part === 'storage');
+          const bucketIndex = pathParts.findIndex(part => part === 'project-files');
+          
+          if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
+            const filePath = pathParts.slice(bucketIndex + 2).join('/'); // Skip 'v1/object/public/project-files'
+            console.log('🗂️ Extracted file path for storage:', filePath);
+            
+            if (filePath) {
+              const { error: storageError } = await supabase.storage
+                .from('project-files')
+                .remove([filePath]);
+
+              if (storageError) {
+                console.warn('⚠️ Error deleting from storage (continuing with DB deletion):', storageError);
+    console.log('📤 Handling uploaded files:', uploadedFiles);
+    
+              } else {
+                console.log('✅ File deleted from storage successfully');
+              }
+            }
+          }
+        } catch (urlError) {
+          console.warn('⚠️ Error parsing URL for storage deletion:', urlError);
         file_url: file.url,
         uploaded_by: user?.id,
       }));
+
+      console.log('💾 Saving file records to database:', fileRecords);
 
       const { data: insertedFiles, error } = await supabase
         .from('project_files')
@@ -849,7 +882,11 @@ export default function ProjectDetailScreen() {
 
       if (error) throw error;
 
-      // Refresh the files list from database to ensure consistency
+      console.log('✅ Files saved to database:', insertedFiles);
+
+      console.log('✅ File deleted from database successfully');
+
+      // Refresh files from database to ensure UI is in sync
       await fetchFiles();
 
       // Create activity log

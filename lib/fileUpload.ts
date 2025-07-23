@@ -112,14 +112,19 @@ export async function uploadFiles(
 
 // Delete file from Supabase Storage
 export async function deleteFile(filePath: string, bucket = 'project-files'): Promise<void> {
+  console.log('🗑️ Deleting file from storage:', { filePath, bucket });
+  
   try {
     const { error } = await supabase.storage
       .from(bucket)
       .remove([filePath]);
 
     if (error) {
+      console.error('❌ Storage deletion error:', error);
       throw error;
     }
+    
+    console.log('✅ File deleted from storage successfully');
   } catch (error) {
     console.error('Error deleting file:', error);
     throw new Error(`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`);
