@@ -1,3 +1,4 @@
+import { CurrencyCode, formatCurrency as formatCurrencyWithCode } from './currency';
 export function formatDistanceToNow(date: Date): string {
   const now = new Date();
   const diffInMs = now.getTime() - date.getTime();
@@ -18,11 +19,8 @@ export function formatDistanceToNow(date: Date): string {
   }
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
+export function formatCurrency(amount: number, currency: CurrencyCode = 'USD'): string {
+  return formatCurrencyWithCode(amount, currency);
 }
 
 export function getStatusColor(status: string): string {

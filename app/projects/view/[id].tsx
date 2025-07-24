@@ -103,11 +103,100 @@ export default function ProjectDetailScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<ProjectFile | null>(null);
 
+  // Progress states
+  const [useAutoProgress, setUseAutoProgress] = useState(true);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [newProgress, setNewProgress] = useState('');
+
   // Form states
   const [newTask, setNewTask] = useState({ title: '', description: '' });
   const [newTimeEntry, setNewTimeEntry] = useState({ description: '', duration: '', date: new Date().toISOString().split('T')[0] });
 
   const isMobile = Platform.OS !== 'web' || window.innerWidth < 768;
+
+  // Calculate progress based on tasks
+  const calculateProgress = () => {
+    return calculateProgressFromTasks(tasks);
+  };
+
+
+  const calculateProgressFromTasks = (taskList: Task[]) => {
+    if (taskList.length === 0) return 0;
+    const completedTasks = taskList.filter(task => task.completed).length;
+    return Math.round((completedTasks / taskList.length) * 100);
+  };
+
+  // Get the current progress value
+  // Get the current progress value
+  const getCurrentProgress = () => {
+    if (!project) return 0;
+    if (useAutoProgress) {
+      // Only calculate from tasks if we have tasks loaded
+      return tasks.length > 0 ? calculateProgress() : (project.progress || 0);
+    }
+    return project.progress || 0;
+  };
+
+  // Add the missing updateProjectProgress function
+  const updateProjectProgress = async (progressValue: number) => {
+    if (!project || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ progress: progressValue })
+        .eq('id', project.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setProject(prev => prev ? { ...prev, progress: progressValue } : null);
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'project_updated',
+          title: `Project progress updated to ${progressValue}%`,
+          description: `Progress updated for project: ${project.name}`,
+          entity_type: 'project',
+          entity_id: project.id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      Alert.alert('Success', `Project progress updated to ${progressValue}%`);
+    } catch (error) {
+      console.error('Error updating project progress:', error);
+      Alert.alert('Error', 'Failed to update project progress');
+    }
+  };
+
+  // Handle manual progress update
+  const handleUpdateProgress = () => {
+    const progressValue = parseInt(newProgress);
+    if (isNaN(progressValue) || progressValue < 0 || progressValue > 100) {
+      Alert.alert('Error', 'Please enter a valid progress value between 0 and 100');
+      return;
+    }
+
+    updateProjectProgress(progressValue);
+    setNewProgress('');
+    setShowProgressModal(false);
+  };
+
+  // Update progress mode
+  // Update progress mode
+  const toggleProgressMode = async () => {
+    const newMode = !useAutoProgress;
+    setUseAutoProgress(newMode);
+
+    if (newMode && tasks.length > 0) {
+      // If switching to auto and we have tasks, update the database with calculated progress
+      const calculatedProgress = calculateProgress();
+      await updateProjectProgress(calculatedProgress);
+    }
+  };
 
   // Project status options
   const projectStatusOptions = [
@@ -595,10 +684,11 @@ export default function ProjectDetailScreen() {
     if (id) {
       fetchProjectDetails();
       fetchActivities();
-      fetchTasks();
+      fetchTasks(); // This will now fetch real data
       fetchTimeEntries();
       fetchFiles();
     }
+
     const refreshFiles = () => {
       if (activeTab === 'files') {
         fetchFiles();
@@ -610,9 +700,18 @@ export default function ProjectDetailScreen() {
       window.addEventListener('focus', refreshFiles);
       return () => window.removeEventListener('focus', refreshFiles);
     }
+  }, [id, activeTab]);
 
-  }, [id, activeTab,]);
-
+  // Add another useEffect to handle progress updates when tasks change:
+  useEffect(() => {
+    if (useAutoProgress && tasks.length >= 0 && project) {
+      const newProgress = calculateProgress();
+      // Only update if progress actually changed to avoid infinite loops
+      if (project.progress !== newProgress) {
+        updateProjectProgress(newProgress);
+      }
+    }
+  }, [tasks, useAutoProgress]);
   const fetchProjectDetails = async () => {
     if (!user || !id) return;
 
@@ -660,23 +759,23 @@ export default function ProjectDetailScreen() {
   };
 
   const fetchTasks = async () => {
-    // Mock data for now - in a real app, you'd fetch from a tasks table
-    setTasks([
-      {
-        id: '1',
-        title: 'Design wireframes',
-        description: 'Create initial wireframes for the main user flows',
-        completed: true,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        title: 'Set up development environment',
-        description: 'Configure local development setup and CI/CD pipeline',
-        completed: false,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    if (!user || !id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_tasks') // Assuming you have a project_tasks table
+        .select('*')
+        .eq('project_id', id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTasks(data || []);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      // If table doesn't exist, keep empty array instead of mock data
+      setTasks([]);
+    }
   };
 
   const fetchTimeEntries = async () => {
@@ -793,34 +892,159 @@ export default function ProjectDetailScreen() {
     router.push(`/contracts/ai-generate?projectId=${id}`);
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTask.title.trim()) {
       Alert.alert('Error', 'Please enter a task title');
       return;
     }
 
-    const task: Task = {
-      id: Date.now().toString(),
-      title: newTask.title.trim(),
-      description: newTask.description.trim(),
-      completed: false,
-      created_at: new Date().toISOString(),
-    };
+    if (!user || !id) return;
 
-    setTasks(prev => [task, ...prev]);
-    setNewTask({ title: '', description: '' });
-    setShowAddTaskModal(false);
+    try {
+      const taskData = {
+        project_id: id,
+        user_id: user.id,
+        title: newTask.title.trim(),
+        description: newTask.description.trim(),
+        completed: false,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('project_tasks')
+        .insert([taskData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local state
+      setTasks(prev => [data, ...prev]);
+
+      // Update progress if in auto mode
+      if (useAutoProgress) {
+        const newTaskList = [data, ...tasks];
+        const newProgress = newTaskList.length > 0 ? calculateProgressFromTasks(newTaskList) : 0;
+        await updateProjectProgress(newProgress);
+      }
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'task_created',
+          title: `Task created: ${newTask.title}`,
+          description: `New task added to project: ${project?.name}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      setNewTask({ title: '', description: '' });
+      setShowAddTaskModal(false);
+      Alert.alert('Success', 'Task added successfully');
+    } catch (error) {
+      console.error('Error adding task:', error);
+      Alert.alert('Error', 'Failed to add task');
+    }
   };
 
-  const toggleTask = (taskId: string) => {
-    setTasks(prev => prev.map(task =>
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
+  // Update the toggleTask function:
+  const toggleTask = async (taskId: string) => {
+    if (!user) return;
+
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const newCompletedStatus = !task.completed;
+
+      const { error } = await supabase
+        .from('project_tasks')
+        .update({ completed: newCompletedStatus })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedTasks = tasks.map(t =>
+        t.id === taskId ? { ...t, completed: newCompletedStatus } : t
+      );
+      setTasks(updatedTasks);
+
+      // Update progress if in auto mode
+      if (useAutoProgress) {
+        const newProgress = calculateProgressFromTasks(updatedTasks);
+        await updateProjectProgress(newProgress);
+      }
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'task_updated',
+          title: `Task ${newCompletedStatus ? 'completed' : 'reopened'}: ${task.title}`,
+          description: `Task status updated in project: ${project?.name}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+    } catch (error) {
+      console.error('Error updating task:', error);
+      Alert.alert('Error', 'Failed to update task');
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
+  // Update the deleteTask function:
+  const deleteTask = async (taskId: string) => {
+    if (!user) return;
+
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const { error } = await supabase
+        .from('project_tasks')
+        .delete()
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedTasks = tasks.filter(t => t.id !== taskId);
+      setTasks(updatedTasks);
+
+      // Update progress if in auto mode
+      if (useAutoProgress) {
+        const newProgress = updatedTasks.length > 0 ? calculateProgressFromTasks(updatedTasks) : 0;
+        await updateProjectProgress(newProgress);
+      }
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'task_deleted',
+          title: `Task deleted: ${task.title}`,
+          description: `Task removed from project: ${project?.name}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      Alert.alert('Success', 'Task deleted successfully');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      Alert.alert('Error', 'Failed to delete task');
+    }
   };
+
 
   const handleAddTimeEntry = () => {
     if (!newTimeEntry.description.trim() || !newTimeEntry.duration) {
@@ -970,92 +1194,151 @@ export default function ProjectDetailScreen() {
     </TouchableOpacity>
   );
 
-  const OverviewTab = () => (
-    <View style={styles.tabContent}>
-      {/* Description */}
-      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
-        <Text style={[styles.description, { color: colors.textSecondary }]}>
-          {project.description || 'No description provided'}
-        </Text>
-      </View>
+  const OverviewTab = () => {
+    const currentProgress = getCurrentProgress();
+    return (
+      <View style={styles.tabContent}>
+        {/* Description */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
+            {project?.description || 'No description provided'}
+          </Text>
+        </View>
 
-      {/* Progress */}
-      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Progress</Text>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { backgroundColor: colors.borderLight }]}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${project.progress}%`,
-                  backgroundColor: getStatusColor(project.status)
-                }
-              ]}
-            />
+        {/* Progress */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Progress</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={toggleProgressMode}
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: useAutoProgress ? colors.primary : colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  marginRight: 8
+                }}
+              >
+                <Text style={{
+                  fontSize: 12,
+                  color: useAutoProgress ? 'white' : colors.textSecondary,
+                  fontFamily: 'Inter-Medium'
+                }}>
+                  {useAutoProgress ? 'Auto' : 'Manual'}
+                </Text>
+              </TouchableOpacity>
+
+              {!useAutoProgress && project && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewProgress(project.progress.toString());
+                    setShowProgressModal(true);
+                  }}
+                  style={{
+                    padding: 4,
+                    borderRadius: 4,
+                    backgroundColor: colors.background
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.primary }}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <Text style={[styles.progressText, { color: colors.text }]}>{project.progress}%</Text>
+
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBar, { backgroundColor: colors.borderLight }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${currentProgress}%`,
+                    backgroundColor: project ? getStatusColor(project.status) : colors.primary
+                  }
+                ]}
+              />
+            </View>
+            <Text style={[styles.progressText, { color: colors.text }]}>
+              {currentProgress}%
+            </Text>
+          </View>
+
+          {/* Progress details */}
+          <View style={{ marginTop: 8 }}>
+            {useAutoProgress ? (
+              <Text style={[{ fontSize: 12, color: colors.textMuted }]}>
+                {tasks.filter(task => task.completed).length} of {tasks.length} tasks completed
+              </Text>
+            ) : (
+              <Text style={[{ fontSize: 12, color: colors.textMuted }]}>
+                Manually set progress
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Team Members */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Team Members</Text>
+          {project?.project_members && project.project_members.length > 0 ? (
+            <View style={styles.teamList}>
+              {project.project_members.map((member, index) => (
+                <View key={index} style={styles.teamMember}>
+                  <View style={[styles.memberAvatar, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.memberInitial}>
+                      {member.team_member.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.memberInfo}>
+                    <Text style={[styles.memberName, { color: colors.text }]}>
+                      {member.team_member.name}
+                    </Text>
+                    <Text style={[styles.memberRole, { color: colors.textSecondary }]}>
+                      {member.team_member.role}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              No team members assigned
+            </Text>
+          )}
+        </View>
+
+        {/* Recent Activity */}
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+          {activities.length > 0 ? (
+            <View style={styles.activityList}>
+              {activities.map((activity) => (
+                <View key={activity.id} style={styles.activityItem}>
+                  <View style={[styles.activityDot, { backgroundColor: colors.primary }]} />
+                  <View style={styles.activityContent}>
+                    <Text style={[styles.activityTitle, { color: colors.text }]}>
+                      {activity.title}
+                    </Text>
+                    <Text style={[styles.activityTime, { color: colors.textMuted }]}>
+                      {formatDistanceToNow(new Date(activity.created_at))}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              No recent activity
+            </Text>
+          )}
         </View>
       </View>
-
-      {/* Team Members */}
-      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Team Members</Text>
-        {project.project_members && project.project_members.length > 0 ? (
-          <View style={styles.teamList}>
-            {project.project_members.map((member, index) => (
-              <View key={index} style={styles.teamMember}>
-                <View style={[styles.memberAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.memberInitial}>
-                    {member.team_member.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text style={[styles.memberName, { color: colors.text }]}>
-                    {member.team_member.name}
-                  </Text>
-                  <Text style={[styles.memberRole, { color: colors.textSecondary }]}>
-                    {member.team_member.role}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No team members assigned
-          </Text>
-        )}
-      </View>
-
-      {/* Recent Activity */}
-      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
-        {activities.length > 0 ? (
-          <View style={styles.activityList}>
-            {activities.map((activity) => (
-              <View key={activity.id} style={styles.activityItem}>
-                <View style={[styles.activityDot, { backgroundColor: colors.primary }]} />
-                <View style={styles.activityContent}>
-                  <Text style={[styles.activityTitle, { color: colors.text }]}>
-                    {activity.title}
-                  </Text>
-                  <Text style={[styles.activityTime, { color: colors.textMuted }]}>
-                    {formatDistanceToNow(new Date(activity.created_at))}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No recent activity
-          </Text>
-        )}
-      </View>
-    </View>
-  );
+    );
+  };
 
   const FilesTab = () => {
     const handlePreviewFile = async (file: ProjectFile) => {
@@ -1375,37 +1658,39 @@ export default function ProjectDetailScreen() {
             <ArrowLeft size={20} color={colors.textSecondary} />
           </TouchableOpacity>
           <Text style={styles.projectTitle} numberOfLines={1}>
-            {project.name}
+            {project?.name || 'Project'}
           </Text>
         </View>
-        <StatusDropdown
-          currentStatus={project.status}
-          options={projectStatusOptions}
-          onStatusChange={(status: string) => {
-            // Cast status to the correct type and call the async function
-            updateProjectStatus(status as 'todo' | 'in_progress' | 'completed');
-          }}
-        />
+        {project && (
+          <StatusDropdown
+            currentStatus={project.status}
+            options={projectStatusOptions}
+            onStatusChange={(status: string) => {
+              updateProjectStatus(status as 'todo' | 'in_progress' | 'completed');
+            }}
+          />
+        )}
       </View>
 
+      {/* Stats */}
       {/* Stats */}
       <View style={styles.statsContainer}>
         <StatsCard
           icon={DollarSign}
           label="Budget"
-          value={formatCurrency(project.budget || 0)}
+          value={formatCurrency(project?.budget || 0)}
           color="#10B981"
         />
         <StatsCard
           icon={TrendingUp}
           label="Progress"
-          value={`${project.progress}%`}
+          value={`${getCurrentProgress()}%`}
           color="#3B82F6"
         />
         <StatsCard
           icon={Calendar}
           label="Due Date"
-          value={project.end_date ? new Date(project.end_date).toLocaleDateString() : 'Not set'}
+          value={project?.end_date ? new Date(project.end_date).toLocaleDateString() : 'Not set'}
           color="#F59E0B"
         />
       </View>
@@ -1706,7 +1991,7 @@ export default function ProjectDetailScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: colors.error, borderColor: colors.error }]}
                 onPress={() => {
-                  if (fileToDelete) {
+                  if (fileToDelete && project) {
                     handleDeleteFile(fileToDelete.id, fileToDelete.url, fileToDelete.name);
                   }
                 }}

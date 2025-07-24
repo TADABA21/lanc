@@ -26,15 +26,15 @@ import {
   Plus,
   Mail,
   LogOut,
-  Bell,
-  Search,
-  TrendingUp,
+  
+   TrendingUp,
   Clock,
   DollarSign,
   Menu,
 } from 'lucide-react-native';
 import { Activity, Project, Client, Invoice, Employee } from '@/types/database';
 import { formatCurrency } from '@/lib/utils';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -383,12 +383,9 @@ export default function DashboardScreen() {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerButton}>
-                <Search size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
-                <Bell size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
+              
+              
+              <NotificationCenter />
               <TouchableOpacity style={styles.headerButton} onPress={handleSignOut}>
                 <LogOut size={20} color={colors.textSecondary} />
               </TouchableOpacity>
