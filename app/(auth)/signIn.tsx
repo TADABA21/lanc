@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState } from 'react';
 import {
   View,
@@ -83,6 +84,8 @@ export default function SignInScreen() {
       borderWidth: 1,
       borderColor: colors.border,
       color: colors.text,
+      width: '50%',
+      alignSelf: 'center',
     },
     button: {
       backgroundColor: colors.primary,
@@ -90,6 +93,8 @@ export default function SignInScreen() {
       padding: 16,
       alignItems: 'center',
       marginTop: 8,
+      width: '50%',
+      alignSelf: 'center',
     },
     buttonDisabled: {
       opacity: 0.6,

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -26,7 +27,7 @@ export default function AuthLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
+      <Stack.Screen name="signIn" />
       <Stack.Screen name="signup" />
     </Stack>
   );

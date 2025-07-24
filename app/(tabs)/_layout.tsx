@@ -1,3 +1,4 @@
+import React from 'react';
 import { Redirect, Tabs } from 'expo-router';
 import { Chrome as Home, FolderOpen, Users, User, Menu, Award } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,7 +35,7 @@ export default function TabLayout() {
   }
 
   if (!session) {
-    return <Redirect href="/(auth)" />;
+    return <Redirect href="/signIn" />;
   }
 
   // Calculate proper spacing for Android to avoid system navigation
