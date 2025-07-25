@@ -323,7 +323,8 @@ export default function AdminDashboardScreen() {
                 Review user feedback, ratings, and feature requests
               </Text>
               <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>View Feedback</Text>
+                <Text style={styles.actionButtonText}
+                  onPress={() => router.push('/admin/feedback-submissions')}>View Feedback</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           </View>
