@@ -23,6 +23,7 @@ import { Employee } from '@/types/database';
 import { User, Search, Plus, Mail, Phone, CreditCard as Edit, Trash2, X } from 'lucide-react-native';
 import { getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
 
 export default function TeamScreen() {
   const { user } = useAuth();

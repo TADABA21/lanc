@@ -18,6 +18,7 @@ import { Testimonial } from '@/types/database';
 import { Award, Star, Share2, ExternalLink, MoveVertical as MoreVertical } from 'lucide-react-native';
 import { formatDistanceToNow } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
 
 export default function TestimonialsScreen() {
   const { user } = useAuth();

@@ -23,6 +23,7 @@ import { Project, Client } from '@/types/database';
 import { FolderOpen, Search, Plus, CreditCard as Edit, Trash2, Eye, X } from 'lucide-react-native';
 import { getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
 
 export default function ProjectsScreen() {
   const { user } = useAuth();
