@@ -13,6 +13,7 @@ import { Link } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { UserPlus } from 'lucide-react-native';
+import React from 'react';
 
 export default function SignUpScreen() {
   const [firstName, setFirstName] = useState('');
@@ -113,6 +114,7 @@ export default function SignUpScreen() {
       borderWidth: 1,
       borderColor: colors.border,
       color: colors.text,
+      
     },
     button: {
       backgroundColor: colors.primary,
@@ -125,6 +127,8 @@ export default function SignUpScreen() {
       shadowOpacity: 0.2,
       shadowRadius: 4,
       elevation: 4,
+      width: '50%',
+      alignSelf: 'center',
     },
     buttonDisabled: {
       opacity: 0.6,
@@ -224,7 +228,7 @@ export default function SignUpScreen() {
             <View style={styles.footer}>
               <Text style={styles.footerText}>
                 Already have an account?{' '}
-                <Link href="/(auth)" asChild>
+                <Link href="/(auth)/signIn" asChild>
                   <Text style={styles.link}>Sign In</Text>
                 </Link>
               </Text>
