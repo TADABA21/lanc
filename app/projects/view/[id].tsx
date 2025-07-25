@@ -98,6 +98,9 @@ export default function ProjectDetailScreen() {
 
   // Modal states
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showDeleteTimeModal, setShowDeleteTimeModal] = useState(false);
+  const [timeEntryToDelete, setTimeEntryToDelete] = useState<TimeEntry | null>(null);
+
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -779,23 +782,27 @@ export default function ProjectDetailScreen() {
   };
 
   const fetchTimeEntries = async () => {
-    // Mock data for now - in a real app, you'd fetch from a time_entries table
-    setTimeEntries([
-      {
-        id: '1',
-        description: 'Initial project setup and planning',
-        duration: 120, // minutes
-        date: '2025-01-15',
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        description: 'Design review and feedback session',
-        duration: 90,
-        date: '2025-01-14',
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    if (!user || !id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_time_entries')
+        .select('*')
+        .eq('project_id', id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching time entries:', error);
+        setTimeEntries([]);
+        return;
+      }
+
+      setTimeEntries(data || []);
+    } catch (error) {
+      console.error('Error fetching time entries:', error);
+      setTimeEntries([]);
+    }
   };
 
   const fetchFiles = async () => {
@@ -873,15 +880,46 @@ export default function ProjectDetailScreen() {
     }
   };
 
-  const handleTimeEntryComplete = (description: string, duration: number) => {
-    const newEntry: TimeEntry = {
-      id: Date.now().toString(),
-      description,
-      duration,
-      date: new Date().toISOString().split('T')[0],
-      created_at: new Date().toISOString(),
-    };
-    setTimeEntries(prev => [newEntry, ...prev]);
+  const handleTimeEntryComplete = async (description: string, duration: number) => {
+    if (!user || !id) return;
+
+    try {
+      const timeEntryData = {
+        project_id: id,
+        user_id: user.id,
+        description: description.trim(),
+        duration: duration,
+        date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('project_time_entries')
+        .insert([timeEntryData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTimeEntries(prev => [data, ...prev]);
+
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'time_logged',
+          title: `Time logged: ${Math.floor(duration / 60)}h ${duration % 60}m`,
+          description: `${description} - Duration: ${Math.floor(duration / 60)}h ${duration % 60}m`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      Alert.alert('Success', 'Time entry recorded successfully');
+    } catch (error) {
+      console.error('Error recording time entry:', error);
+      Alert.alert('Error', 'Failed to record time entry');
+    }
   };
 
   const handleCreateInvoice = () => {
@@ -1046,24 +1084,106 @@ export default function ProjectDetailScreen() {
   };
 
 
-  const handleAddTimeEntry = () => {
+  const handleAddTimeEntry = async () => {
     if (!newTimeEntry.description.trim() || !newTimeEntry.duration) {
       Alert.alert('Error', 'Please enter description and duration');
       return;
     }
 
-    const entry: TimeEntry = {
-      id: Date.now().toString(),
-      description: newTimeEntry.description.trim(),
-      duration: parseInt(newTimeEntry.duration),
-      date: newTimeEntry.date,
-      created_at: new Date().toISOString(),
-    };
+    if (!user || !id) return;
 
-    setTimeEntries(prev => [entry, ...prev]);
-    setNewTimeEntry({ description: '', duration: '', date: new Date().toISOString().split('T')[0] });
-    setShowAddTimeModal(false);
+    try {
+      const timeEntryData = {
+        project_id: id,
+        user_id: user.id,
+        description: newTimeEntry.description.trim(),
+        duration: parseInt(newTimeEntry.duration),
+        date: newTimeEntry.date,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('project_time_entries')
+        .insert([timeEntryData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTimeEntries(prev => [data, ...prev]);
+
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'time_logged',
+          title: `Manual time entry: ${Math.floor(parseInt(newTimeEntry.duration) / 60)}h ${parseInt(newTimeEntry.duration) % 60}m`,
+          description: `${newTimeEntry.description} - Duration: ${Math.floor(parseInt(newTimeEntry.duration) / 60)}h ${parseInt(newTimeEntry.duration) % 60}m`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+      setNewTimeEntry({ description: '', duration: '', date: new Date().toISOString().split('T')[0] });
+      setShowAddTimeModal(false);
+      Alert.alert('Success', 'Time entry added successfully');
+    } catch (error) {
+      console.error('Error adding time entry:', error);
+      Alert.alert('Error', 'Failed to add time entry');
+    }
   };
+  const deleteTimeEntry = async (timeEntryId: string) => {
+    if (!user) return;
+
+    try {
+      const timeEntry = timeEntries.find(t => t.id === timeEntryId);
+      if (!timeEntry) return;
+
+      const { error } = await supabase
+        .from('project_time_entries')
+        .delete()
+        .eq('id', timeEntryId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update UI - remove from local state
+      setTimeEntries(prev => prev.filter(t => t.id !== timeEntryId));
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert([{
+          type: 'time_deleted',
+          title: `Time entry deleted: ${Math.floor(timeEntry.duration / 60)}h ${timeEntry.duration % 60}m`,
+          description: `Deleted: ${timeEntry.description}`,
+          entity_type: 'project',
+          entity_id: id,
+          user_id: user.id,
+        }]);
+
+      await fetchActivities();
+
+      // Close modal and reset state
+      setShowDeleteTimeModal(false);
+      setTimeEntryToDelete(null);
+
+      Alert.alert('Success', 'Time entry deleted successfully');
+    } catch (error) {
+      console.error('Error deleting time entry:', error);
+      Alert.alert('Error', 'Failed to delete time entry');
+    }
+  };
+  const calculateTotalTime = () => {
+    return timeEntries.reduce((total, entry) => total + entry.duration, 0);
+  };
+
+  const formatTotalTime = (totalMinutes: number) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m`;
+  };
+
 
   const handleFileUpload = () => {
     // File upload is now handled by DocumentPickerComponent
@@ -1504,7 +1624,9 @@ export default function ProjectDetailScreen() {
       </TouchableOpacity>
 
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Time Entries</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Time Entries {timeEntries.length > 0 && `(Total: ${formatTotalTime(calculateTotalTime())})`}
+        </Text>
         {timeEntries.length > 0 ? (
           timeEntries.map((entry) => (
             <View key={entry.id} style={[styles.timeEntryItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -1512,12 +1634,23 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.timeEntryDescription, { color: colors.text }]}>
                   {entry.description}
                 </Text>
-                <Text style={[styles.timeEntryDuration, { color: colors.primary }]}>
-                  {Math.floor(entry.duration / 60)}h {entry.duration % 60}m
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.timeEntryDuration, { color: colors.primary, marginRight: 8 }]}>
+                    {Math.floor(entry.duration / 60)}h {entry.duration % 60}m
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setTimeEntryToDelete(entry);
+                      setShowDeleteTimeModal(true);
+                    }}
+                    style={[styles.taskActionButton, { backgroundColor: colors.error }]}
+                  >
+                    <Trash2 size={14} color="white" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={[styles.timeEntryDate, { color: colors.textMuted }]}>
-                {new Date(entry.date).toLocaleDateString()}
+                {new Date(entry.date).toLocaleDateString()} • Added {formatDistanceToNow(new Date(entry.created_at))} ago
               </Text>
             </View>
           ))
@@ -1693,6 +1826,13 @@ export default function ProjectDetailScreen() {
           value={project?.end_date ? new Date(project.end_date).toLocaleDateString() : 'Not set'}
           color="#F59E0B"
         />
+        <StatsCard
+          icon={Clock}
+          label="Time Logged"
+          value={formatTotalTime(calculateTotalTime())}
+          color="#8B5CF6"
+        />
+
       </View>
 
       {/* Tabs */}
@@ -1998,6 +2138,91 @@ export default function ProjectDetailScreen() {
               >
                 <Text style={[styles.modalButtonText, { color: 'white' }]}>
                   Delete File
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+
+      {/* Delete Time Entry Modal */}
+      <Modal
+        visible={showDeleteTimeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDeleteTimeModal(false);
+          setTimeEntryToDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Time Entry</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  setShowDeleteTimeModal(false);
+                  setTimeEntryToDelete(null);
+                }}
+              >
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[styles.description, { color: colors.textSecondary, textAlign: 'center' }]}>
+                Are you sure you want to delete this time entry? This action cannot be undone.
+              </Text>
+
+              {timeEntryToDelete && (
+                <View style={[
+                  styles.timeEntryItem,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    marginTop: 16,
+                    opacity: 0.8
+                  }
+                ]}>
+                  <View style={styles.timeEntryHeader}>
+                    <Text style={[styles.timeEntryDescription, { color: colors.text }]}>
+                      {timeEntryToDelete.description}
+                    </Text>
+                    <Text style={[styles.timeEntryDuration, { color: colors.primary }]}>
+                      {Math.floor(timeEntryToDelete.duration / 60)}h {timeEntryToDelete.duration % 60}m
+                    </Text>
+                  </View>
+                  <Text style={[styles.timeEntryDate, { color: colors.textMuted }]}>
+                    {new Date(timeEntryToDelete.date).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={() => {
+                  setShowDeleteTimeModal(false);
+                  setTimeEntryToDelete(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.error, borderColor: colors.error }]}
+                onPress={() => {
+                  if (timeEntryToDelete) {
+                    deleteTimeEntry(timeEntryToDelete.id);
+                  }
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>
+                  Delete Entry
                 </Text>
               </TouchableOpacity>
             </View>
