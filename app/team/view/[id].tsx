@@ -16,24 +16,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { supabase } from '@/lib/supabase';
 import { Employee, Project, Activity } from '@/types/database';
-import { 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  Calendar, 
-  DollarSign, 
-  Briefcase, 
-  User, 
-  MapPin, 
-  Clock, 
-  TrendingUp, 
-  FolderOpen, 
-  Award, 
-  ExternalLink, 
-  Edit, 
-  MessageSquare 
-} from 'lucide-react-native';
-import { formatCurrency, formatDistanceToNow, getStatusColor } from '@/lib/utils';
+import { ArrowLeft, Mail, Phone, Calendar, DollarSign, Briefcase, User, MapPin, Clock, TrendingUp, FolderOpen, Award, ExternalLink, CreditCard as Edit, MessageSquare } from 'lucide-react-native';
+import { formatDistanceToNow, getStatusColor } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusDropdown } from '@/components/StatusDropdown';
 
@@ -49,6 +34,7 @@ export default function TeamMemberDetailScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { shouldShowSidebar } = useSidebar();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

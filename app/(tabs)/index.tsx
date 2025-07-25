@@ -12,12 +12,14 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrency } from '@/hooks/useCurrency';
 import { StatsCard } from '@/components/StatsCard';
 import { ActivityItem } from '@/components/ActivityItem';
 import { ProjectStatusChart } from '@/components/ProjectStatusChart';
 import { QuickActions } from '@/components/QuickActions';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { CurrencySelector } from '@/components/CurrencySelector';
 import { 
   FolderOpen, 
   Users, 
@@ -33,7 +35,6 @@ import {
   Menu,
 } from 'lucide-react-native';
 import { Activity, Project, Client, Invoice, Employee } from '@/types/database';
-import { formatCurrency } from '@/lib/utils';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -43,6 +44,7 @@ export default function DashboardScreen() {
   const { user, userProfile, signOut } = useAuth();
   const { colors } = useTheme();
   const { shouldShowSidebar, openSidebar } = useSidebar();
+  const { formatCurrency, currency, updateCurrency } = useCurrency();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -247,6 +249,9 @@ export default function DashboardScreen() {
       flexDirection: 'row',
       gap: 8,
     },
+    currencySelector: {
+      marginRight: 8,
+    },
     headerButton: {
       width: 40,
       height: 40,
@@ -383,6 +388,12 @@ export default function DashboardScreen() {
               </View>
             </View>
             <View style={styles.headerActions}>
+              <View style={styles.currencySelector}>
+                <CurrencySelector
+                  value={currency}
+                  onCurrencyChange={updateCurrency}
+                />
+              </View>
               
               
               <NotificationCenter />

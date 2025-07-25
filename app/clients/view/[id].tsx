@@ -29,7 +29,8 @@ import {
   MessageSquare,
   ExternalLink
 } from 'lucide-react-native';
-import { formatCurrency, formatDistanceToNow } from '@/lib/utils';
+import { formatDistanceToNow } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ClientWithStats = Client & {
@@ -44,6 +45,7 @@ export default function ClientDetailScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { shouldShowSidebar } = useSidebar();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   

@@ -38,6 +38,9 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="email" />
+            <Stack.Screen name="contact" />
+            <Stack.Screen name="feedback" />
+            <Stack.Screen name="admin" />
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="auto" />

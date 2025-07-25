@@ -18,9 +18,10 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useCurrency } from '@/hooks/useCurrency';
 import { Client, Project } from '@/types/database';
 import { Users, Search, Plus, Mail, Phone, CreditCard as Edit, Trash2, FolderOpen, X } from 'lucide-react-native';
-import { formatCurrency, getStatusColor } from '@/lib/utils';
+import { getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from 'react';
 
@@ -28,6 +29,7 @@ export default function ClientsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { shouldShowSidebar } = useSidebar();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [clients, setClients] = useState<Client[]>([]);
