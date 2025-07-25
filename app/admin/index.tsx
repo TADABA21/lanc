@@ -304,8 +304,9 @@ export default function AdminDashboardScreen() {
                 View and manage contact form submissions from users
               </Text>
               <TouchableOpacity style={styles.actionButton}
-                onPress={() => router.push('/admin/contact-submissions')}>
+              onPress={() => router.push('/admin/contact-submissions')}>
                 <Text style={styles.actionButtonText}>View Contacts</Text>
+                
               </TouchableOpacity>
             </TouchableOpacity>
 
@@ -322,9 +323,9 @@ export default function AdminDashboardScreen() {
               <Text style={styles.actionDescription}>
                 Review user feedback, ratings, and feature requests
               </Text>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}
-                  onPress={() => router.push('/admin/feedback-submissions')}>View Feedback</Text>
+              <TouchableOpacity style={styles.actionButton}
+              onPress={() => router.push('/admin/feedback-submissions')}>
+                <Text style={styles.actionButtonText}>View Feedback</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           </View>
