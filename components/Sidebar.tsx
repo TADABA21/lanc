@@ -31,6 +31,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  MessageSquare,
+  Heart,
 } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -50,6 +52,8 @@ const sidebarItems: SidebarItem[] = [
   { id: 'team', title: 'Team', icon: User, route: '/(tabs)/team' },
   { id: 'testimonials', title: 'Testimonials', icon: Award, route: '/(tabs)/testimonials', showOnMobile: true },
   { id: 'email', title: 'Email Composer', icon: Mail, route: '/email/ai-compose', showOnMobile: true },
+  { id: 'contact', title: 'Contact Us', icon: MessageSquare, route: '/contact', showOnMobile: true },
+  { id: 'feedback', title: 'Send Feedback', icon: Heart, route: '/feedback', showOnMobile: true },
 ];
 
 export function Sidebar() {

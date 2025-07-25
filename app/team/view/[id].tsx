@@ -33,7 +33,8 @@ import {
   Edit, 
   MessageSquare 
 } from 'lucide-react-native';
-import { formatCurrency, formatDistanceToNow, getStatusColor } from '@/lib/utils';
+import { formatDistanceToNow, getStatusColor } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusDropdown } from '@/components/StatusDropdown';
 
@@ -49,6 +50,7 @@ export default function TeamMemberDetailScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { shouldShowSidebar } = useSidebar();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

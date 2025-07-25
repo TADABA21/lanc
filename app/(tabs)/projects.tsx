@@ -18,15 +18,17 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useCurrency } from '@/hooks/useCurrency';
 import { Project, Client } from '@/types/database';
 import { FolderOpen, Search, Plus, CreditCard as Edit, Trash2, Eye, X } from 'lucide-react-native';
-import { formatCurrency, getStatusColor } from '@/lib/utils';
+import { getStatusColor } from '@/lib/utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProjectsScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { shouldShowSidebar } = useSidebar();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [projects, setProjects] = useState<(Project & { client?: Client })[]>([]);

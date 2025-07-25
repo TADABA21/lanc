@@ -28,7 +28,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session);
+      
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed successfully');
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
+        setSession(null);
+        setUserProfile(null);
+        setLoading(false);
+        return;
+      }
+      
       setSession(session);
       if (session?.user) {
         fetchUserProfile(session.user.id);
@@ -37,6 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false);
     });
+    
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
