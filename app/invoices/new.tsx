@@ -8,14 +8,20 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  Platform,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { generateWithGroq, invoicePrompts } from '@/lib/groq';
 import { Client, Project } from '@/types/database';
-import { ArrowLeft, Save, X, Plus, Trash2, FileText, Calendar, DollarSign, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, Save, X, Plus, Trash2, FileText, Calendar, DollarSign, ChevronDown, Sparkles, Eye, Download } from 'lucide-react-native';
 import { DatePicker } from '@/components/DatePicker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 interface InvoiceItem {
   description: string;
@@ -46,8 +52,10 @@ export default function NewInvoiceScreen() {
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -88,6 +96,64 @@ export default function NewInvoiceScreen() {
     }
   };
 
+  const handleAIGenerate = async () => {
+    const selectedClient = clients.find(c => c.id === formData.client_id);
+    const selectedProject = projects.find(p => p.id === formData.project_id);
+    
+    if (!selectedClient) {
+      Alert.alert('Error', 'Please select a client first');
+      return;
+    }
+
+    setAiGenerating(true);
+    
+    try {
+      const messages = invoicePrompts.generateInvoice(
+        selectedClient.name,
+        selectedProject?.name || 'General Services',
+        items
+      );
+      
+      const aiResponse = await generateWithGroq(messages);
+      
+      // Parse AI response for notes and terms
+      const lines = aiResponse.split('\n');
+      let notes = '';
+      let terms = '';
+      let currentSection = '';
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine.toLowerCase().includes('notes:')) {
+          currentSection = 'notes';
+          continue;
+        } else if (trimmedLine.toLowerCase().includes('terms:')) {
+          currentSection = 'terms';
+          continue;
+        }
+
+        if (currentSection === 'notes' && trimmedLine) {
+          notes += trimmedLine + '\n';
+        } else if (currentSection === 'terms' && trimmedLine) {
+          terms += trimmedLine + '\n';
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        notes: notes.trim() || `Thank you for your business, ${selectedClient.name}! We appreciate the opportunity to work with ${selectedClient.company}.`,
+        terms: terms.trim() || 'Payment due within 30 days. Late payments may incur additional fees.',
+      }));
+      
+      Alert.alert('Success', 'AI has generated professional invoice content!');
+    } catch (error) {
+      console.error('Error generating with AI:', error);
+      Alert.alert('Error', 'Failed to generate invoice content with AI. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const addItem = () => {
     setItems([...items, { description: '', quantity: 1, rate: 0, amount: 0 }]);
   };
@@ -120,6 +186,227 @@ export default function NewInvoiceScreen() {
 
   const calculateTotal = () => {
     return calculateSubtotal() + calculateTax();
+  };
+
+  const handlePreview = () => {
+    if (items.some(item => !item.description.trim())) {
+      Alert.alert('Incomplete Items', 'Please fill in all item descriptions before previewing.');
+      return;
+    }
+    setShowPreview(true);
+  };
+
+  const handleDownload = async () => {
+    if (items.some(item => !item.description.trim())) {
+      Alert.alert('Incomplete Items', 'Please fill in all item descriptions before downloading.');
+      return;
+    }
+
+    try {
+      const selectedClient = clients.find(c => c.id === formData.client_id);
+      const html = generateInvoiceHTML(formData, items, selectedClient);
+      
+      const { uri } = await Print.printToFileAsync({
+        html,
+        base64: false,
+      });
+
+      if (Platform.OS === 'web') {
+        // For web, create a download link
+        const link = document.createElement('a');
+        link.href = uri;
+        link.download = `${formData.invoice_number}.pdf`;
+        link.click();
+      } else {
+        // For mobile, use sharing
+        await Sharing.shareAsync(uri);
+      }
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      Alert.alert('Error', 'Failed to download invoice. Please try again.');
+    }
+  };
+
+  const generateInvoiceHTML = (invoice: typeof formData, items: InvoiceItem[], client?: Client) => {
+    const subtotal = calculateSubtotal();
+    const tax = calculateTax();
+    const total = calculateTotal();
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Invoice ${invoice.invoice_number}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 20px;
+            }
+            .invoice-header {
+              background: linear-gradient(135deg, #3B82F6, #1E40AF);
+              color: white;
+              padding: 40px;
+              margin: -20px -20px 40px -20px;
+            }
+            .invoice-title {
+              font-size: 48px;
+              font-weight: bold;
+              margin-bottom: 20px;
+            }
+            .company-info {
+              text-align: right;
+            }
+            .invoice-details {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 40px;
+            }
+            .bill-to {
+              flex: 1;
+            }
+            .invoice-meta {
+              text-align: right;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 40px;
+            }
+            .items-table th,
+            .items-table td {
+              padding: 12px;
+              text-align: left;
+              border-bottom: 1px solid #E5E7EB;
+            }
+            .items-table th {
+              background-color: #F3F4F6;
+              font-weight: bold;
+            }
+            .totals {
+              text-align: right;
+              margin-bottom: 40px;
+            }
+            .totals table {
+              margin-left: auto;
+              border-collapse: collapse;
+            }
+            .totals td {
+              padding: 8px 16px;
+              border-bottom: 1px solid #E5E7EB;
+            }
+            .total-row {
+              font-weight: bold;
+              font-size: 18px;
+              background-color: #3B82F6;
+              color: white;
+            }
+            .notes {
+              background-color: #F8FAFC;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+            }
+            .footer {
+              text-align: center;
+              color: #6B7280;
+              font-size: 12px;
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid #E5E7EB;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div class="invoice-title">Invoice</div>
+                <div style="font-size: 18px;">#${invoice.invoice_number}</div>
+              </div>
+              <div class="company-info">
+                <div style="font-size: 24px; font-weight: bold;">LANCELOT</div>
+                <div>Business Management Platform</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="invoice-details">
+            <div class="bill-to">
+              <h3>Bill To:</h3>
+              <div style="font-size: 18px; font-weight: bold;">${client?.name || 'Client Name'}</div>
+              <div>${client?.company || 'Company Name'}</div>
+              ${client?.address ? `<div>${client.address}</div>` : ''}
+              ${client?.email ? `<div>${client.email}</div>` : ''}
+              ${client?.phone ? `<div>${client.phone}</div>` : ''}
+            </div>
+            <div class="invoice-meta">
+              <div><strong>Invoice Date:</strong> ${invoice.issue_date.toLocaleDateString()}</div>
+              <div><strong>Due Date:</strong> ${invoice.due_date.toLocaleDateString()}</div>
+            </div>
+          </div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td>${item.description}</td>
+                  <td>${item.quantity}</td>
+                  <td>$${item.rate.toFixed(2)}</td>
+                  <td>$${item.amount.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="totals">
+            <table>
+              <tr>
+                <td>Subtotal:</td>
+                <td>$${subtotal.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td>Tax (10%):</td>
+                <td>$${tax.toFixed(2)}</td>
+              </tr>
+              <tr class="total-row">
+                <td>Total:</td>
+                <td>$${total.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          ${invoice.notes ? `
+            <div class="notes">
+              <h4>Notes:</h4>
+              <p>${invoice.notes}</p>
+            </div>
+          ` : ''}
+
+          ${invoice.terms ? `
+            <div class="notes">
+              <h4>Terms:</h4>
+              <p>${invoice.terms}</p>
+            </div>
+          ` : ''}
+
+          <div class="footer">
+            Generated by LANCELOT on ${new Date().toLocaleDateString()}
+          </div>
+        </body>
+      </html>
+    `;
   };
 
   const handleSave = async () => {
@@ -257,6 +544,58 @@ export default function NewInvoiceScreen() {
     },
     scrollContent: {
       padding: 24,
+    },
+    aiSection: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    aiHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    aiIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    aiTitle: {
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      color: colors.text,
+    },
+    aiDescription: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: colors.textSecondary,
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    aiButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+    },
+    aiButtonDisabled: {
+      opacity: 0.6,
+    },
+    aiButtonText: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+      color: 'white',
+      marginLeft: 8,
     },
     section: {
       marginBottom: 32,
@@ -473,6 +812,93 @@ export default function NewInvoiceScreen() {
       minHeight: 80,
       textAlignVertical: 'top',
     },
+    actionButtons: {
+      flexDirection: 'row',
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    primaryActionButton: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    secondaryActionButton: {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+    },
+    actionButtonText: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+      marginLeft: 8,
+    },
+    primaryActionButtonText: {
+      color: 'white',
+    },
+    secondaryActionButtonText: {
+      color: colors.primary,
+    },
+    // Preview Modal Styles
+    previewModal: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    previewHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 24,
+      paddingVertical: 20,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    previewTitle: {
+      fontSize: 20,
+      fontFamily: 'Inter-Bold',
+      color: colors.text,
+    },
+    previewContent: {
+      flex: 1,
+      padding: 24,
+    },
+    previewInvoice: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewInvoiceHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    previewInvoiceTitle: {
+      fontSize: 32,
+      fontFamily: 'Inter-Bold',
+      color: colors.primary,
+    },
+    previewInvoiceNumber: {
+      fontSize: 16,
+      fontFamily: 'Inter-Medium',
+      color: colors.textSecondary,
+    },
   });
 
   return (
@@ -495,21 +921,41 @@ export default function NewInvoiceScreen() {
               Cancel
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleSave}
-            disabled={loading}
-          >
-            <Save size={16} color="white" />
-            <Text style={styles.headerButtonText}>
-              {loading ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
+      >
+        {/* AI Generation Section */}
+        <View style={styles.aiSection}>
+          <View style={styles.aiHeader}>
+            <View style={styles.aiIcon}>
+              <Sparkles size={20} color="white" />
+            </View>
+            <Text style={styles.aiTitle}>AI-Powered Invoice Enhancement</Text>
+          </View>
+          <Text style={styles.aiDescription}>
+            Generate professional notes and terms for your invoice using AI.
+          </Text>
+          <TouchableOpacity
+            style={[styles.aiButton, (aiGenerating || !formData.client_id) && styles.aiButtonDisabled]}
+            onPress={handleAIGenerate}
+            disabled={aiGenerating || !formData.client_id}
+          >
+            {aiGenerating ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Sparkles size={16} color="white" />
+            )}
+            <Text style={styles.aiButtonText}>
+              {aiGenerating ? 'Generating...' : 'Generate Notes & Terms'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Invoice Details</Text>
           
@@ -546,7 +992,10 @@ export default function NewInvoiceScreen() {
               </TouchableOpacity>
               
               {showClientDropdown && (
-                <ScrollView style={styles.dropdownList}>
+                <ScrollView 
+                  style={styles.dropdownList}
+                  showsVerticalScrollIndicator={Platform.OS === 'web'}
+                >
                   {clients.map((client) => (
                     <TouchableOpacity
                       key={client.id}
@@ -581,7 +1030,10 @@ export default function NewInvoiceScreen() {
               </TouchableOpacity>
               
               {showProjectDropdown && (
-                <ScrollView style={styles.dropdownList}>
+                <ScrollView 
+                  style={styles.dropdownList}
+                  showsVerticalScrollIndicator={Platform.OS === 'web'}
+                >
                   <TouchableOpacity
                     style={styles.dropdownItem}
                     onPress={() => {
@@ -741,6 +1193,97 @@ export default function NewInvoiceScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.secondaryActionButton]}
+          onPress={handlePreview}
+        >
+          <Eye size={16} color={colors.primary} />
+          <Text style={[styles.actionButtonText, styles.secondaryActionButtonText]}>
+            Preview
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.secondaryActionButton]}
+          onPress={handleDownload}
+        >
+          <Download size={16} color={colors.primary} />
+          <Text style={[styles.actionButtonText, styles.secondaryActionButtonText]}>
+            Download
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.actionButton, styles.primaryActionButton]}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          <Save size={16} color="white" />
+          <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>
+            {loading ? 'Saving...' : 'Save'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Preview Modal */}
+      <Modal
+        visible={showPreview}
+        animationType="slide"
+        onRequestClose={() => setShowPreview(false)}
+      >
+        <View style={styles.previewModal}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewTitle}>Invoice Preview</Text>
+            <TouchableOpacity onPress={() => setShowPreview(false)}>
+              <X size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView 
+            style={styles.previewContent}
+            showsVerticalScrollIndicator={Platform.OS === 'web'}
+          >
+            <View style={styles.previewInvoice}>
+              <View style={styles.previewInvoiceHeader}>
+                <View>
+                  <Text style={styles.previewInvoiceTitle}>Invoice</Text>
+                  <Text style={styles.previewInvoiceNumber}>#{formData.invoice_number}</Text>
+                </View>
+                <View>
+                  <Text style={[styles.totalFinalValue, { fontSize: 24 }]}>
+                    ${calculateTotal().toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={{ marginBottom: 20 }}>
+                <Text style={[styles.label, { marginBottom: 8 }]}>Bill To:</Text>
+                <Text style={[styles.totalFinalLabel, { fontSize: 16 }]}>
+                  {selectedClient?.name || 'Client Name'}
+                </Text>
+                <Text style={styles.totalLabel}>{selectedClient?.company || 'Company'}</Text>
+              </View>
+
+              <View style={{ marginBottom: 20 }}>
+                <Text style={[styles.label, { marginBottom: 8 }]}>Items:</Text>
+                {items.map((item, index) => (
+                  <View key={index} style={[styles.totalRow, { marginBottom: 4 }]}>
+                    <Text style={styles.totalLabel}>{item.description}</Text>
+                    <Text style={styles.totalValue}>${item.amount.toFixed(2)}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={[styles.totalRow, styles.totalFinal]}>
+                <Text style={styles.totalFinalLabel}>Total</Text>
+                <Text style={styles.totalFinalValue}>${calculateTotal().toFixed(2)}</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
