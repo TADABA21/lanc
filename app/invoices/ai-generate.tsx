@@ -38,11 +38,446 @@ interface InvoiceItem {
   amount: number;
 }
 
+// Fixed StyleSheet moved outside component to prevent recreation on every render
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  headerButtonSecondary: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  headerButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: 'white',
+    marginLeft: 6,
+  },
+  headerButtonTextSecondary: {
+    color: colors.textSecondary,
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+  },
+  summaryContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 24,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+  },
+  parseToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  parseToggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  parseToggleButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  parseToggleText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+  },
+  parseToggleTextActive: {
+    color: 'white',
+  },
+  parseToggleTextInactive: {
+    color: colors.textSecondary,
+  },
+  summaryInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  summaryHint: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  aiSection: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  aiTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  aiDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  aiButtonDisabled: {
+    opacity: 0.6,
+  },
+  aiButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: 'white',
+    marginLeft: 8,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  required: {
+    color: colors.error,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  inputText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  dropdownText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  dropdownPlaceholder: {
+    color: colors.textMuted,
+  },
+  dropdownModal: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  dropdownListContainer: {
+    maxHeight: '60%',
+    marginHorizontal: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  dropdownList: {
+    flex: 1,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  itemsContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  itemHeaderTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  addItemText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: 'white',
+    marginLeft: 4,
+  },
+  item: {
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  itemInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+  },
+  itemInputSmall: {
+    width: 80,
+  },
+  itemActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  itemAmount: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  removeButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: colors.error,
+  },
+  totalsContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: colors.textSecondary,
+  },
+  totalValue: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+  },
+  totalFinal: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  totalFinalLabel: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  totalFinalValue: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  primaryActionButton: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  secondaryActionButton: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    marginLeft: 8,
+  },
+  primaryActionButtonText: {
+    color: 'white',
+  },
+  secondaryActionButtonText: {
+    color: colors.primary,
+  },
+});
+
 export default function AIInvoiceGeneratorScreen() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  
+  // Fixed: Memoize styles to prevent recreation
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   
   const [formData, setFormData] = useState({
     invoice_number: `INV-${Date.now()}`,
@@ -73,7 +508,7 @@ export default function AIInvoiceGeneratorScreen() {
     if (projectId) {
       fetchProjectDetails();
     }
-  }, [projectId]);
+  }, [projectId, user]); // Added user dependency
 
   const fetchClients = async () => {
     if (!user) return;
@@ -89,6 +524,7 @@ export default function AIInvoiceGeneratorScreen() {
       setClients(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error);
+      Alert.alert('Error', 'Failed to fetch clients');
     }
   };
 
@@ -106,6 +542,7 @@ export default function AIInvoiceGeneratorScreen() {
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
+      Alert.alert('Error', 'Failed to fetch projects');
     }
   };
 
@@ -122,33 +559,36 @@ export default function AIInvoiceGeneratorScreen() {
       
       if (error) throw error;
       
-      if (data.client_id) {
+      if (data?.client_id) {
         setFormData(prev => ({ ...prev, client_id: data.client_id }));
       }
     } catch (error) {
       console.error('Error fetching project details:', error);
+      Alert.alert('Error', 'Failed to fetch project details');
     }
   };
 
   const addItem = () => {
-    setItems([...items, { description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setItems(prev => [...prev, { description: '', quantity: 1, rate: 0, amount: 0 }]);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+      setItems(prev => prev.filter((_, i) => i !== index));
     }
   };
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    if (field === 'quantity' || field === 'rate') {
-      newItems[index].amount = newItems[index].quantity * newItems[index].rate;
-    }
-    
-    setItems(newItems);
+    setItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], [field]: value };
+      
+      if (field === 'quantity' || field === 'rate') {
+        newItems[index].amount = newItems[index].quantity * newItems[index].rate;
+      }
+      
+      return newItems;
+    });
   };
 
   const calculateSubtotal = () => {
@@ -182,20 +622,25 @@ export default function AIInvoiceGeneratorScreen() {
           const parseMessages = invoicePrompts.parseSummary(formData.summary);
           const parseResponse = await generateWithGroq(parseMessages);
           
-          // Try to parse the response as JSON
-          const parsedItems = JSON.parse(parseResponse);
-          if (Array.isArray(parsedItems)) {
-            generatedItems = parsedItems.map(item => ({
-              description: item.description || '',
-              quantity: item.quantity || 1,
-              rate: item.rate || 0,
-              amount: (item.quantity || 1) * (item.rate || 0)
-            }));
-            setItems(generatedItems);
+          // Fixed: Better JSON parsing with error handling
+          try {
+            const parsedItems = JSON.parse(parseResponse);
+            if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+              generatedItems = parsedItems.map(item => ({
+                description: item.description || '',
+                quantity: Number(item.quantity) || 1,
+                rate: Number(item.rate) || 0,
+                amount: (Number(item.quantity) || 1) * (Number(item.rate) || 0)
+              }));
+              setItems(generatedItems);
+            }
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            Alert.alert('Notice', 'AI response could not be parsed. Please review the generated content.');
           }
         } catch (e) {
-          console.error('Failed to parse AI response as JSON', e);
-          Alert.alert('Notice', 'AI had trouble parsing the summary. Please review the generated items.');
+          console.error('Failed to parse summary with AI:', e);
+          Alert.alert('Error', 'Failed to parse summary. Please try again.');
         }
       }
 
@@ -286,16 +731,19 @@ export default function AIInvoiceGeneratorScreen() {
       
       if (invoiceError) throw invoiceError;
 
-      await supabase
-        .from('activities')
-        .insert([{
-          type: 'invoice_created',
-          title: `Invoice created: ${formData.invoice_number}`,
-          description: `Total: $${total.toFixed(2)}`,
-          entity_type: 'invoice',
-          entity_id: invoice.id,
-          user_id: user.id,
-        }]);
+      // Fixed: Added null check for invoice
+      if (invoice) {
+        await supabase
+          .from('activities')
+          .insert([{
+            type: 'invoice_created',
+            title: `Invoice created: ${formData.invoice_number}`,
+            description: `Total: $${total.toFixed(2)}`,
+            entity_type: 'invoice',
+            entity_id: invoice.id,
+            user_id: user.id,
+          }]);
+      }
 
       Alert.alert('Success', 'Invoice created successfully!');
       router.back();
@@ -307,8 +755,9 @@ export default function AIInvoiceGeneratorScreen() {
     }
   };
 
-  const selectedClient = clients.find(c => c.id === formData.client_id);
-  const selectedProject = projects.find(p => p.id === formData.project_id);
+  // Fixed: Memoized computed values
+  const selectedClient = React.useMemo(() => clients.find(c => c.id === formData.client_id), [clients, formData.client_id]);
+  const selectedProject = React.useMemo(() => projects.find(p => p.id === formData.project_id), [projects, formData.project_id]);
 
   const renderDropdownModal = (items: any[], selectedValue: string, onSelect: (value: string) => void, visible: boolean, onClose: () => void) => {
     return (
@@ -343,453 +792,6 @@ export default function AIInvoiceGeneratorScreen() {
       </Modal>
     );
   };
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 24,
-      paddingVertical: 20,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    backButton: {
-      marginRight: 16,
-      padding: 8,
-      borderRadius: 8,
-      backgroundColor: colors.background,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontFamily: 'Inter-Bold',
-      color: colors.text,
-    },
-    headerActions: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    headerButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: colors.primary,
-    },
-    headerButtonSecondary: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    headerButtonText: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      color: 'white',
-      marginLeft: 6,
-    },
-    headerButtonTextSecondary: {
-      color: colors.textSecondary,
-    },
-    content: {
-      flex: 1,
-    },
-    scrollContent: {
-      padding: 24,
-    },
-    summaryContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: 24,
-    },
-    summaryHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    summaryTitle: {
-      fontSize: 16,
-      fontFamily: 'Inter-SemiBold',
-      color: colors.text,
-    },
-    parseToggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: 'hidden',
-    },
-    parseToggleButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    parseToggleButtonActive: {
-      backgroundColor: colors.primary,
-    },
-    parseToggleText: {
-      fontSize: 12,
-      fontFamily: 'Inter-Medium',
-    },
-    parseToggleTextActive: {
-      color: 'white',
-    },
-    parseToggleTextInactive: {
-      color: colors.textSecondary,
-    },
-    summaryInput: {
-      minHeight: 100,
-      textAlignVertical: 'top',
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 14,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    summaryHint: {
-      fontSize: 12,
-      fontFamily: 'Inter-Regular',
-      color: colors.textMuted,
-      marginTop: 8,
-      lineHeight: 16,
-    },
-    aiSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    aiHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    aiIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    aiTitle: {
-      fontSize: 18,
-      fontFamily: 'Inter-Bold',
-      color: colors.text,
-    },
-    aiDescription: {
-      fontSize: 14,
-      fontFamily: 'Inter-Regular',
-      color: colors.textSecondary,
-      marginBottom: 16,
-      lineHeight: 20,
-    },
-    aiButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 12,
-      backgroundColor: colors.primary,
-    },
-    aiButtonDisabled: {
-      opacity: 0.6,
-    },
-    aiButtonText: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      color: 'white',
-      marginLeft: 8,
-    },
-    section: {
-      marginBottom: 32,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontFamily: 'Inter-Bold',
-      color: colors.text,
-      marginBottom: 20,
-    },
-    inputGroup: {
-      marginBottom: 20,
-    },
-    label: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    required: {
-      color: colors.error,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontSize: 16,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    inputWithIcon: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    inputIcon: {
-      marginRight: 12,
-    },
-    inputText: {
-      flex: 1,
-      fontSize: 16,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    dropdownButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    dropdownText: {
-      fontSize: 16,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    dropdownPlaceholder: {
-      color: colors.textMuted,
-    },
-    dropdownModal: {
-      flex: 1,
-      justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    dropdownListContainer: {
-      maxHeight: '60%',
-      marginHorizontal: 20,
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
-    dropdownList: {
-      flex: 1,
-    },
-    dropdownItem: {
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
-    },
-    dropdownItemText: {
-      fontSize: 16,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    itemsContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    itemHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    itemHeaderTitle: {
-      fontSize: 16,
-      fontFamily: 'Inter-SemiBold',
-      color: colors.text,
-    },
-    addItemButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      backgroundColor: colors.primary,
-      borderRadius: 8,
-    },
-    addItemText: {
-      fontSize: 14,
-      fontFamily: 'Inter-Medium',
-      color: 'white',
-      marginLeft: 4,
-    },
-    item: {
-      marginBottom: 16,
-      padding: 16,
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-    },
-    itemRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 12,
-    },
-    itemInput: {
-      flex: 1,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      fontSize: 14,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    itemInputSmall: {
-      width: 80,
-    },
-    itemActions: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    itemAmount: {
-      fontSize: 16,
-      fontFamily: 'Inter-Bold',
-      color: colors.text,
-    },
-    removeButton: {
-      padding: 8,
-      borderRadius: 6,
-      backgroundColor: colors.error,
-    },
-    totalsContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    totalRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    totalLabel: {
-      fontSize: 14,
-      fontFamily: 'Inter-Medium',
-      color: colors.textSecondary,
-    },
-    totalValue: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      color: colors.text,
-    },
-    totalFinal: {
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      paddingTop: 12,
-      marginTop: 8,
-    },
-    totalFinalLabel: {
-      fontSize: 18,
-      fontFamily: 'Inter-Bold',
-      color: colors.text,
-    },
-    totalFinalValue: {
-      fontSize: 18,
-      fontFamily: 'Inter-Bold',
-      color: colors.primary,
-    },
-    textArea: {
-      minHeight: 80,
-      textAlignVertical: 'top',
-    },
-    datePickerButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    datePickerText: {
-      fontSize: 16,
-      fontFamily: 'Inter-Regular',
-      color: colors.text,
-    },
-    actionButtons: {
-      flexDirection: 'row',
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      gap: 12,
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    actionButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-    },
-    primaryActionButton: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    secondaryActionButton: {
-      backgroundColor: colors.background,
-      borderColor: colors.border,
-    },
-    actionButtonText: {
-      fontSize: 14,
-      fontFamily: 'Inter-SemiBold',
-      marginLeft: 8,
-    },
-    primaryActionButtonText: {
-      color: 'white',
-    },
-    secondaryActionButtonText: {
-      color: colors.primary,
-    },
-  });
 
   return (
     <SafeAreaView style={styles.container}>
