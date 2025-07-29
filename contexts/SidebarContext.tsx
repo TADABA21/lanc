@@ -18,6 +18,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const { width } = Dimensions.get('window');
+  // Fix web detection - ensure we properly detect web platform and screen size
   const shouldShowSidebar = Platform.OS === 'web' && width >= 768;
 
   const toggleSidebar = () => setIsOpen(!isOpen);

@@ -1,6 +1,35 @@
 export interface Database {
   public: {
     Tables: {
+      user_profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          email: string | null;
+          avatar_url: string | null;
+          role: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          email?: string | null;
+          avatar_url?: string | null;
+          role?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          full_name?: string | null;
+          email?: string | null;
+          avatar_url?: string | null;
+          role?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       clients: {
         Row: {
           id: string;
@@ -413,6 +442,79 @@ export interface Database {
           created_at?: string;
         };
       };
+      contact_submissions: {
+        Row: {
+          id: string;
+          name: string;
+          email: string;
+          phone: string | null;
+          subject: string;
+          message: string;
+          type: string;
+          status: string;
+          created_at: string;
+          user_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          email: string;
+          phone?: string | null;
+          subject: string;
+          message: string;
+          type?: string;
+          status?: string;
+          created_at?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          email?: string;
+          phone?: string | null;
+          subject?: string;
+          message?: string;
+          type?: string;
+          status?: string;
+          created_at?: string;
+          user_id?: string | null;
+        };
+      };
+      feedback_submissions: {
+        Row: {
+          id: string;
+          rating: number;
+          category: string;
+          title: string;
+          description: string;
+          email: string;
+          status: string;
+          created_at: string;
+          user_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          rating: number;
+          category: string;
+          title: string;
+          description: string;
+          email: string;
+          status?: string;
+          created_at?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          rating?: number;
+          category?: string;
+          title?: string;
+          description?: string;
+          email?: string;
+          status?: string;
+          created_at?: string;
+          user_id?: string | null;
+        };
+      };
     };
     Views: {
       employees: {
@@ -436,6 +538,7 @@ export interface Database {
   };
 }
 
+export type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
 export type Client = Database['public']['Tables']['clients']['Row'];
 export type Project = Database['public']['Tables']['projects']['Row'];
 export type TeamMember = Database['public']['Tables']['team_members']['Row'];
@@ -448,3 +551,5 @@ export type InvoiceItem = Database['public']['Tables']['invoice_items']['Row'];
 export type Contract = Database['public']['Tables']['contracts']['Row'];
 export type EmailTemplate = Database['public']['Tables']['email_templates']['Row'];
 export type ProjectFile = Database['public']['Tables']['project_files']['Row'];
+export type ContactSubmission = Database['public']['Tables']['contact_submissions']['Row'];
+export type FeedbackSubmission = Database['public']['Tables']['feedback_submissions']['Row'];

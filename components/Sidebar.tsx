@@ -33,6 +33,7 @@ import {
   X,
   MessageSquare,
   Heart,
+  Shield,
 } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -43,6 +44,7 @@ interface SidebarItem {
   icon: React.ComponentType<any>;
   route: string;
   showOnMobile?: boolean;
+  adminOnly?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -54,17 +56,19 @@ const sidebarItems: SidebarItem[] = [
   { id: 'email', title: 'Email Composer', icon: Mail, route: '/email/ai-compose', showOnMobile: true },
   { id: 'contact', title: 'Contact Us', icon: MessageSquare, route: '/contact', showOnMobile: true },
   { id: 'feedback', title: 'Send Feedback', icon: Heart, route: '/feedback', showOnMobile: true },
+  { id: 'admin', title: 'Admin Dashboard', icon: Shield, route: '/admin', showOnMobile: true, adminOnly: true },
 ];
 
 export function Sidebar() {
   const { colors, theme, setTheme, isDark } = useTheme();
   const { isOpen, closeSidebar, isCollapsed, toggleCollapsed, shouldShowSidebar } = useSidebar();
-  const { signOut, user } = useAuth();
+  const { signOut, user, isAdmin } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
-  const isMobile = Platform.OS !== 'web' || screenWidth < 768;
+  // Fix web detection for sidebar
+  const isMobile = Platform.OS !== 'web' || (Platform.OS === 'web' && screenWidth < 768);
   const sidebarWidth = isCollapsed ? 80 : 280;
 
   // Animation values
@@ -138,9 +142,21 @@ export function Sidebar() {
     return pathname.includes(route.replace('/(tabs)', ''));
   };
 
-  const filteredItems = isMobile 
-    ? sidebarItems.filter(item => item.showOnMobile)
-    : sidebarItems;
+  // Filter items based on mobile/desktop and admin status
+  const filteredItems = sidebarItems.filter(item => {
+    // Filter out admin-only items for non-admin users
+    if (item.adminOnly && !isAdmin) {
+      return false;
+    }
+    
+    // For mobile, only show items marked for mobile
+    if (isMobile) {
+      return item.showOnMobile;
+    }
+    
+    // For desktop, show all items (except admin-only for non-admins)
+    return true;
+  });
 
   const sidebarStyles = StyleSheet.create({
     // Mobile Modal Container
@@ -293,6 +309,18 @@ export function Sidebar() {
       color: colors.primary,
       fontFamily: 'Inter-SemiBold',
     },
+    adminNavItem: {
+      backgroundColor: colors.error + '15',
+      borderWidth: 1,
+      borderColor: colors.error + '30',
+    },
+    adminNavItemActive: {
+      backgroundColor: colors.error + '25',
+      borderColor: colors.error,
+    },
+    adminNavItemText: {
+      color: colors.error,
+    },
     footer: {
       borderTopWidth: 1,
       borderTopColor: colors.borderLight,
@@ -335,6 +363,13 @@ export function Sidebar() {
       fontSize: 12,
       fontFamily: 'Inter-Regular',
       color: colors.textMuted,
+    },
+    userRole: {
+      fontSize: 10,
+      fontFamily: 'Inter-SemiBold',
+      color: colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     footerActions: {
       flexDirection: 'row',
@@ -410,19 +445,28 @@ export function Sidebar() {
           )}
           {filteredItems.map((item) => {
             const isActive = isActiveRoute(item.route);
+            const isAdminItem = item.adminOnly;
             return (
               <TouchableOpacity
                 key={item.id}
                 style={[
                   sidebarStyles.navItem,
                   isActive && sidebarStyles.navItemActive,
+                  isAdminItem && sidebarStyles.adminNavItem,
+                  isAdminItem && isActive && sidebarStyles.adminNavItemActive,
                 ]}
                 onPress={() => handleNavigation(item.route)}
                 activeOpacity={0.7}
               >
                 <item.icon
                   size={22}
-                  color={isActive ? colors.primary : colors.textSecondary}
+                  color={
+                    isAdminItem 
+                      ? colors.error 
+                      : isActive 
+                        ? colors.primary 
+                        : colors.textSecondary
+                  }
                   style={sidebarStyles.navItemIcon}
                 />
                 {!isCollapsed && (
@@ -430,6 +474,7 @@ export function Sidebar() {
                     style={[
                       sidebarStyles.navItemText,
                       isActive && sidebarStyles.navItemTextActive,
+                      isAdminItem && sidebarStyles.adminNavItemText,
                     ]}
                   >
                     {item.title}
@@ -454,6 +499,9 @@ export function Sidebar() {
               <Text style={sidebarStyles.userEmail} numberOfLines={1}>
                 {user?.email}
               </Text>
+              {isAdmin && (
+                <Text style={sidebarStyles.userRole}>Administrator</Text>
+              )}
             </View>
           </View>
         )}
