@@ -703,6 +703,7 @@ export default function ClientsScreen() {
       <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

@@ -642,6 +642,7 @@ export default function ProjectsScreen() {
       <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

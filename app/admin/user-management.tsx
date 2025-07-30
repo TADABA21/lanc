@@ -139,53 +139,68 @@ export default function UserManagementScreen() {
   };
 
   const toggleUserRole = async (userId: string, currentRole: 'user' | 'admin') => {
-    // Prevent user from removing their own admin role
-    if (userId === user?.id && currentRole === 'admin') {
-      Alert.alert(
-        'Error', 
-        'You cannot remove your own admin privileges'
-      );
-      return;
-    }
-
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    const action = newRole === 'admin' ? 'promote to admin' : 'remove admin privileges';
-
+  // Prevent user from removing their own admin role
+  if (userId === user?.id && currentRole === 'admin') {
     Alert.alert(
-      'Confirm Action',
-      `Are you sure you want to ${action} for this user?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          style: newRole === 'admin' ? 'default' : 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('user_profiles')
-                .update({ role: newRole })
-                .eq('id', userId);
+      'Error', 
+      'You cannot remove your own admin privileges'
+    );
+    return;
+  }
 
-              if (error) throw error;
+  const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  const action = newRole === 'admin' ? 'promote to admin' : 'remove admin privileges';
 
-              // Update local state
-              setUsers(prev => prev.map(u => 
-                u.id === userId ? { ...u, role: newRole } : u
-              ));
+  Alert.alert(
+    'Confirm Action',
+    `Are you sure you want to ${action} for this user?`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        style: newRole === 'admin' ? 'default' : 'destructive',
+        onPress: async () => {
+          try {
+            console.log('Attempting to update user role:', { userId, currentRole, newRole });
+            
+            const { data, error } = await supabase
+              .from('user_profiles')
+              .update({ role: newRole })
+              .eq('id', userId)
+              .select(); // Add select() to get the updated data back
 
-              Alert.alert(
-                'Success', 
-                `User ${newRole === 'admin' ? 'promoted to admin' : 'admin privileges removed'} successfully`
-              );
-            } catch (error) {
-              console.error('Error updating user role:', error);
-              Alert.alert('Error', 'Failed to update user role');
+            if (error) {
+              console.error('Supabase error:', error);
+              throw error;
             }
+
+            console.log('Update successful:', data);
+
+            // Update local state
+            setUsers(prev => prev.map(u => 
+              u.id === userId ? { ...u, role: newRole } : u
+            ));
+
+            Alert.alert(
+              'Success', 
+              `User ${newRole === 'admin' ? 'promoted to admin' : 'admin privileges removed'} successfully`
+            );
+          } catch (error) {
+            console.error('Error updating user role:', error);
+            
+            // More detailed error message
+            let errorMessage = 'Failed to update user role';
+            if (error.message) {
+              errorMessage += `: ${error.message}`;
+            }
+            
+            Alert.alert('Error', errorMessage);
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -414,6 +429,13 @@ export default function UserManagementScreen() {
       color: colors.textSecondary,
       marginTop: 4,
     },
+    currentUserNote: {
+      fontSize: 10,
+      fontFamily: 'Inter-Regular',
+      color: colors.textMuted,
+      fontStyle: 'italic',
+      marginTop: 4,
+    },
   });
 
   if (loading) {
@@ -562,6 +584,7 @@ export default function UserManagementScreen() {
                           userProfile.role === 'admin' ? styles.demoteButton : styles.promoteButton
                         ]}
                         onPress={() => toggleUserRole(userProfile.id, userProfile.role)}
+                        disabled={userProfile.id === user?.id}
                       >
                         {userProfile.role === 'admin' ? (
                           <UserMinus size={16} color="#EF4444" />
@@ -575,6 +598,9 @@ export default function UserManagementScreen() {
                           {userProfile.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
                         </Text>
                       </TouchableOpacity>
+                    )}
+                    {userProfile.id === user?.id && (
+                      <Text style={styles.currentUserNote}>You cannot modify your own role</Text>
                     )}
                   </View>
                 </View>

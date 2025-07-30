@@ -422,6 +422,7 @@ export default function TestimonialsScreen() {
       <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
