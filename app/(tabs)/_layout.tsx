@@ -19,7 +19,8 @@ export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const isMobile = Platform.OS !== 'web' || screenWidth < 768;
+  // Fix web detection for consistent behavior
+  const isMobile = Platform.OS !== 'web' || (Platform.OS === 'web' && screenWidth < 768);
 
   if (loading) {
     return (
