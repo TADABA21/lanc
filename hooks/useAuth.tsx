@@ -32,6 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     });
+    useEffect(() => {
+  console.log('Current user:', user);
+  console.log('Is admin:', isAdmin);
+}, [user, isAdmin]);
+
+ 
+
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event, session);
