@@ -34,6 +34,8 @@ import {
   MessageSquare,
   Heart,
   Shield,
+  FileText,
+  FileCheck,
 } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -53,6 +55,8 @@ const sidebarItems: SidebarItem[] = [
   { id: 'clients', title: 'Clients', icon: Users, route: '/(tabs)/clients' },
   { id: 'team', title: 'Team', icon: User, route: '/(tabs)/team' },
   { id: 'testimonials', title: 'Testimonials', icon: Award, route: '/(tabs)/testimonials', showOnMobile: true },
+  { id: 'invoices', title: 'Saved Invoices', icon: FileText, route: '/invoices/saved', showOnMobile: true },
+  { id: 'contracts', title: 'Saved Contracts', icon: FileCheck, route: '/contracts/saved', showOnMobile: true },
   { id: 'email', title: 'Email Composer', icon: Mail, route: '/email/ai-compose', showOnMobile: true },
   { id: 'contact', title: 'Contact Us', icon: MessageSquare, route: '/contact', showOnMobile: true },
   { id: 'feedback', title: 'Send Feedback', icon: Heart, route: '/feedback', showOnMobile: true },

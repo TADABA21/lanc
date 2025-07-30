@@ -40,6 +40,8 @@ export default function RootLayout() {
             <Stack.Screen name="email" />
             <Stack.Screen name="contact" />
             <Stack.Screen name="feedback" />
+            <Stack.Screen name="invoices" />
+            <Stack.Screen name="contracts" />
             <Stack.Screen name="admin" />
             <Stack.Screen name="+not-found" />
           </Stack>

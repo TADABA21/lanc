@@ -659,6 +659,7 @@ export default function TeamScreen() {
       <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

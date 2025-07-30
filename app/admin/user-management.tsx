@@ -414,6 +414,13 @@ export default function UserManagementScreen() {
       color: colors.textSecondary,
       marginTop: 4,
     },
+    currentUserNote: {
+      fontSize: 10,
+      fontFamily: 'Inter-Regular',
+      color: colors.textMuted,
+      fontStyle: 'italic',
+      marginTop: 4,
+    },
   });
 
   if (loading) {
@@ -562,6 +569,7 @@ export default function UserManagementScreen() {
                           userProfile.role === 'admin' ? styles.demoteButton : styles.promoteButton
                         ]}
                         onPress={() => toggleUserRole(userProfile.id, userProfile.role)}
+                        disabled={userProfile.id === user?.id}
                       >
                         {userProfile.role === 'admin' ? (
                           <UserMinus size={16} color="#EF4444" />
@@ -575,6 +583,9 @@ export default function UserManagementScreen() {
                           {userProfile.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
                         </Text>
                       </TouchableOpacity>
+                    )}
+                    {userProfile.id === user?.id && (
+                      <Text style={styles.currentUserNote}>You cannot modify your own role</Text>
                     )}
                   </View>
                 </View>

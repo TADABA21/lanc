@@ -630,7 +630,6 @@ export default function AIContractGeneratorScreen() {
       fontFamily: 'Inter-Regular',
       color: colors.text,
       lineHeight: 24,
-      whiteSpace: 'pre-wrap',
     },
   });
 
