@@ -29,6 +29,8 @@ export default function SavedContractsScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null);
 
   useEffect(() => {
     fetchContracts();
@@ -73,48 +75,59 @@ export default function SavedContractsScreen() {
       });
 
       if (Platform.OS === 'web') {
+        // For web, create download link
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = uri;
-        link.download = `${contract.title}.pdf`;
+        link.href = url;
+        link.download = `${contract.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
       } else {
-        await Sharing.shareAsync(uri);
+        // For mobile, use sharing
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save Contract',
+          UTI: 'com.adobe.pdf'
+        });
       }
+      
+      Alert.alert('Success', 'Contract downloaded successfully');
     } catch (error) {
       console.error('Error downloading contract:', error);
-      Alert.alert('Error', 'Failed to download contract');
+      Alert.alert('Error', 'Failed to download contract. Please try again.');
     }
   };
 
-  const handleDelete = async (contractId: string) => {
-    Alert.alert(
-      'Delete Contract',
-      'Are you sure you want to delete this contract? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('contracts')
-                .delete()
-                .eq('id', contractId)
-                .eq('user_id', user?.id);
+  const handleDeletePress = (contract: Contract) => {
+    setContractToDelete(contract);
+    setShowDeleteModal(true);
+  };
 
-              if (error) throw error;
-              
-              await fetchContracts();
-              Alert.alert('Success', 'Contract deleted successfully');
-            } catch (error) {
-              console.error('Error deleting contract:', error);
-              Alert.alert('Error', 'Failed to delete contract');
-            }
-          }
-        }
-      ]
-    );
+  const confirmDelete = async () => {
+    if (!contractToDelete || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('contracts')
+        .delete()
+        .eq('id', contractToDelete.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      // Update local state immediately
+      setContracts(prev => prev.filter(c => c.id !== contractToDelete.id));
+      setShowDeleteModal(false);
+      setContractToDelete(null);
+      Alert.alert('Success', 'Contract deleted successfully');
+    } catch (error) {
+      console.error('Error deleting contract:', error);
+      Alert.alert('Error', 'Failed to delete contract. Please try again.');
+    }
   };
 
   const generateContractHTML = (contract: Contract) => {
@@ -134,6 +147,7 @@ export default function SavedContractsScreen() {
               max-width: 800px;
               margin: 0 auto;
               padding: 40px 20px;
+              background: white;
             }
             .header {
               text-align: center;
@@ -154,6 +168,8 @@ export default function SavedContractsScreen() {
             .content {
               white-space: pre-wrap;
               line-height: 1.8;
+              font-size: 14px;
+              text-align: justify;
             }
             .footer {
               margin-top: 40px;
@@ -162,6 +178,9 @@ export default function SavedContractsScreen() {
               text-align: center;
               color: #64748B;
               font-size: 12px;
+            }
+            @media print {
+              body { margin: 0; padding: 20px; }
             }
           </style>
         </head>
@@ -220,7 +239,7 @@ export default function SavedContractsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => handleDelete(contract.id)}
+              onPress={() => handleDeletePress(contract)}
             >
               <Trash2 size={16} color={colors.error} />
             </TouchableOpacity>
@@ -403,6 +422,58 @@ export default function SavedContractsScreen() {
       color: colors.text,
       lineHeight: 20,
     },
+    // Delete modal styles
+    deleteModalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '85%',
+      maxWidth: 400,
+    },
+    deleteModalTitle: {
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      color: colors.text,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    deleteModalMessage: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 20,
+    },
+    deleteModalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    deleteModalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    deleteButton: {
+      backgroundColor: colors.error,
+    },
+    deleteModalButtonText: {
+      fontSize: 14,
+      fontFamily: 'Inter-Medium',
+    },
+    cancelButtonText: {
+      color: colors.textSecondary,
+    },
+    deleteButtonText: {
+      color: 'white',
+    },
   });
 
   return (
@@ -461,6 +532,46 @@ export default function SavedContractsScreen() {
                 </Text>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <Text style={styles.deleteModalTitle}>Delete Contract</Text>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete "{contractToDelete?.title}"? This action cannot be undone.
+            </Text>
+            
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setContractToDelete(null);
+                }}
+              >
+                <Text style={[styles.deleteModalButtonText, styles.cancelButtonText]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteButton]}
+                onPress={confirmDelete}
+              >
+                <Text style={[styles.deleteModalButtonText, styles.deleteButtonText]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

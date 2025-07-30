@@ -32,21 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     });
-    useEffect(() => {
-  console.log('Current user:', user);
-  console.log('Is admin:', isAdmin);
-}, [user, isAdmin]);
-
  
+
+
 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event, session);
-      
+
       if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed successfully');
       }
-      
+
       if (event === 'SIGNED_OUT') {
         console.log('User signed out');
         setSession(null);
@@ -54,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      
+
       setSession(session);
       if (session?.user) {
         fetchUserProfile(session.user.id);
@@ -63,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     });
-    
+
     return () => {
       subscription?.unsubscribe();
     };
@@ -77,9 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('full_name, role')
         .eq('id', userId)
         .single();
-      
+
       console.log('User profile response:', { data, error });
-      
+
       if (error) {
         console.error('Error fetching user profile:', error);
         // If profile doesn't exist, create one with default values
@@ -95,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 role: 'user'
               }
             ]);
-          
+
           if (!insertError) {
             setUserProfile({ full_name: '', role: 'user' });
           }
@@ -124,9 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     });
-    
+
     if (error) throw error;
-    
+
     // If user is created and we have a full name, save it to the profile
     // New users get 'user' role by default
     if (data.user && fullName) {

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -28,7 +29,8 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle,
-  Crown
+  Crown,
+  X
 } from 'lucide-react-native';
 
 interface UserProfile {
@@ -37,6 +39,13 @@ interface UserProfile {
   email: string;
   role: 'user' | 'admin';
   created_at: string;
+}
+
+interface SupabaseError {
+  message: string;
+  details?: string;
+  hint?: string;
+  code?: string;
 }
 
 // Admin Guard Component
@@ -82,6 +91,222 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Role Change Modal Component
+interface RoleChangeModalProps {
+  visible: boolean;
+  user: UserProfile | null;
+  onClose: () => void;
+  onConfirm: (userId: string, newRole: 'user' | 'admin') => void;
+}
+
+function RoleChangeModal({ visible, user, onClose, onConfirm }: RoleChangeModalProps) {
+  const { colors } = useTheme();
+  
+  if (!user) return null;
+
+  const newRole = user.role === 'admin' ? 'user' : 'admin';
+  const isPromoting = newRole === 'admin';
+  const actionText = isPromoting ? 'Promote to Administrator' : 'Remove Administrator Rights';
+  const warningText = isPromoting 
+    ? 'This user will gain full administrative privileges including the ability to manage other users.' 
+    : 'This user will lose all administrative privileges and will only have regular user access.';
+
+  const modalStyles = StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modal: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 20,
+      fontFamily: 'Inter-Bold',
+      color: colors.text,
+      flex: 1,
+      marginRight: 16,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    userInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    adminAvatar: {
+      backgroundColor: '#10B981',
+    },
+    regularAvatar: {
+      backgroundColor: colors.primary,
+    },
+    userDetails: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    userEmail: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: colors.textSecondary,
+    },
+    warningContainer: {
+      backgroundColor: isPromoting ? '#10B98115' : '#EF444415',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 24,
+    },
+    warningIcon: {
+      alignSelf: 'center',
+      marginBottom: 12,
+    },
+    warningTitle: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: isPromoting ? '#10B981' : '#EF4444',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    warningText: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: colors.text,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    button: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.border,
+    },
+    confirmButton: {
+      backgroundColor: isPromoting ? '#10B981' : '#EF4444',
+    },
+    buttonText: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+    },
+    cancelButtonText: {
+      color: colors.text,
+    },
+    confirmButtonText: {
+      color: 'white',
+    },
+  });
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.modal}>
+          <View style={modalStyles.header}>
+            <Text style={modalStyles.title}>{actionText}</Text>
+            <TouchableOpacity style={modalStyles.closeButton} onPress={onClose}>
+              <X size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={modalStyles.userInfo}>
+            <View style={[
+              modalStyles.avatar,
+              user.role === 'admin' ? modalStyles.adminAvatar : modalStyles.regularAvatar
+            ]}>
+              {user.role === 'admin' ? (
+                <Crown size={24} color="white" />
+              ) : (
+                <User size={24} color="white" />
+              )}
+            </View>
+            <View style={modalStyles.userDetails}>
+              <Text style={modalStyles.userName}>
+                {user.full_name || 'Unknown User'}
+              </Text>
+              <Text style={modalStyles.userEmail}>{user.email}</Text>
+            </View>
+          </View>
+
+          <View style={modalStyles.warningContainer}>
+            <View style={modalStyles.warningIcon}>
+              {isPromoting ? (
+                <Shield size={32} color="#10B981" />
+              ) : (
+                <AlertCircle size={32} color="#EF4444" />
+              )}
+            </View>
+            <Text style={modalStyles.warningTitle}>
+              {isPromoting ? 'Grant Admin Access' : 'Remove Admin Access'}
+            </Text>
+            <Text style={modalStyles.warningText}>
+              {warningText}
+            </Text>
+          </View>
+
+          <View style={modalStyles.buttonContainer}>
+            <TouchableOpacity style={[modalStyles.button, modalStyles.cancelButton]} onPress={onClose}>
+              <Text style={[modalStyles.buttonText, modalStyles.cancelButtonText]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[modalStyles.button, modalStyles.confirmButton]} 
+              onPress={() => onConfirm(user.id, newRole)}
+            >
+              <Text style={[modalStyles.buttonText, modalStyles.confirmButtonText]}>
+                Confirm
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function UserManagementScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -92,6 +317,8 @@ export default function UserManagementScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -100,6 +327,21 @@ export default function UserManagementScreen() {
   useEffect(() => {
     filterUsers();
   }, [users, searchQuery]);
+
+  // Type guard for error handling
+  const isSupabaseError = (error: unknown): error is SupabaseError => {
+    return typeof error === 'object' && error !== null && 'message' in error;
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    if (isSupabaseError(error)) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'An unknown error occurred';
+  };
 
   const fetchUsers = async () => {
     try {
@@ -113,7 +355,7 @@ export default function UserManagementScreen() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      Alert.alert('Error', 'Failed to fetch users');
+      Alert.alert('Error', `Failed to fetch users: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -138,69 +380,54 @@ export default function UserManagementScreen() {
     setRefreshing(false);
   };
 
-  const toggleUserRole = async (userId: string, currentRole: 'user' | 'admin') => {
-  // Prevent user from removing their own admin role
-  if (userId === user?.id && currentRole === 'admin') {
-    Alert.alert(
-      'Error', 
-      'You cannot remove your own admin privileges'
-    );
-    return;
-  }
+  const showRoleChangeModal = (userProfile: UserProfile) => {
+    // Prevent user from removing their own admin role
+    if (userProfile.id === user?.id && userProfile.role === 'admin') {
+      Alert.alert(
+        'Error', 
+        'You cannot remove your own admin privileges'
+      );
+      return;
+    }
 
-  const newRole = currentRole === 'admin' ? 'user' : 'admin';
-  const action = newRole === 'admin' ? 'promote to admin' : 'remove admin privileges';
+    setSelectedUser(userProfile);
+    setModalVisible(true);
+  };
 
-  Alert.alert(
-    'Confirm Action',
-    `Are you sure you want to ${action} for this user?`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        style: newRole === 'admin' ? 'default' : 'destructive',
-        onPress: async () => {
-          try {
-            console.log('Attempting to update user role:', { userId, currentRole, newRole });
-            
-            const { data, error } = await supabase
-              .from('user_profiles')
-              .update({ role: newRole })
-              .eq('id', userId)
-              .select(); // Add select() to get the updated data back
+  const handleRoleChange = async (userId: string, newRole: 'user' | 'admin') => {
+    try {
+      console.log('Attempting to update user role:', { userId, newRole });
+      
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({ role: newRole })
+        .eq('id', userId)
+        .select();
 
-            if (error) {
-              console.error('Supabase error:', error);
-              throw error;
-            }
-
-            console.log('Update successful:', data);
-
-            // Update local state
-            setUsers(prev => prev.map(u => 
-              u.id === userId ? { ...u, role: newRole } : u
-            ));
-
-            Alert.alert(
-              'Success', 
-              `User ${newRole === 'admin' ? 'promoted to admin' : 'admin privileges removed'} successfully`
-            );
-          } catch (error) {
-            console.error('Error updating user role:', error);
-            
-            // More detailed error message
-            let errorMessage = 'Failed to update user role';
-            if (error.message) {
-              errorMessage += `: ${error.message}`;
-            }
-            
-            Alert.alert('Error', errorMessage);
-          }
-        }
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
       }
-    ]
-  );
-};
+
+      console.log('Update successful:', data);
+
+      // Update local state
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+
+      setModalVisible(false);
+      setSelectedUser(null);
+
+      Alert.alert(
+        'Success', 
+        `User ${newRole === 'admin' ? 'promoted to admin' : 'admin privileges removed'} successfully`
+      );
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      Alert.alert('Error', `Failed to update user role: ${getErrorMessage(error)}`);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -583,8 +810,7 @@ export default function UserManagementScreen() {
                           styles.actionButton, 
                           userProfile.role === 'admin' ? styles.demoteButton : styles.promoteButton
                         ]}
-                        onPress={() => toggleUserRole(userProfile.id, userProfile.role)}
-                        disabled={userProfile.id === user?.id}
+                        onPress={() => showRoleChangeModal(userProfile)}
                       >
                         {userProfile.role === 'admin' ? (
                           <UserMinus size={16} color="#EF4444" />
@@ -608,6 +834,16 @@ export default function UserManagementScreen() {
             )}
           </View>
         </ScrollView>
+
+        <RoleChangeModal
+          visible={modalVisible}
+          user={selectedUser}
+          onClose={() => {
+            setModalVisible(false);
+            setSelectedUser(null);
+          }}
+          onConfirm={handleRoleChange}
+        />
       </SafeAreaView>
     </AdminGuard>
   );

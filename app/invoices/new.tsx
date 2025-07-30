@@ -34,7 +34,7 @@ export default function NewInvoiceScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState({
     invoice_number: `INV-${Date.now()}`,
     client_id: '',
@@ -44,11 +44,11 @@ export default function NewInvoiceScreen() {
     notes: '',
     terms: 'Payment due within 30 days',
   });
-  
+
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, rate: 0, amount: 0 }
   ]);
-  
+
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,14 +64,14 @@ export default function NewInvoiceScreen() {
 
   const fetchClients = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
         .eq('user_id', user.id)
         .order('name');
-      
+
       if (error) throw error;
       setClients(data || []);
     } catch (error) {
@@ -81,14 +81,14 @@ export default function NewInvoiceScreen() {
 
   const fetchProjects = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .eq('user_id', user.id)
         .order('name');
-      
+
       if (error) throw error;
       setProjects(data || []);
     } catch (error) {
@@ -99,23 +99,23 @@ export default function NewInvoiceScreen() {
   const handleAIGenerate = async () => {
     const selectedClient = clients.find(c => c.id === formData.client_id);
     const selectedProject = projects.find(p => p.id === formData.project_id);
-    
+
     if (!selectedClient) {
       Alert.alert('Error', 'Please select a client first');
       return;
     }
 
     setAiGenerating(true);
-    
+
     try {
       const messages = invoicePrompts.generateInvoice(
         selectedClient.name,
         selectedProject?.name || 'General Services',
         items
       );
-      
+
       const aiResponse = await generateWithGroq(messages);
-      
+
       // Parse AI response for notes and terms
       const lines = aiResponse.split('\n');
       let notes = '';
@@ -144,7 +144,7 @@ export default function NewInvoiceScreen() {
         notes: notes.trim() || `Thank you for your business, ${selectedClient.name}! We appreciate the opportunity to work with ${selectedClient.company}.`,
         terms: terms.trim() || 'Payment due within 30 days. Late payments may incur additional fees.',
       }));
-      
+
       Alert.alert('Success', 'AI has generated professional invoice content!');
     } catch (error) {
       console.error('Error generating with AI:', error);
@@ -167,12 +167,12 @@ export default function NewInvoiceScreen() {
   const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Calculate amount
     if (field === 'quantity' || field === 'rate') {
       newItems[index].amount = newItems[index].quantity * newItems[index].rate;
     }
-    
+
     setItems(newItems);
   };
 
@@ -205,10 +205,12 @@ export default function NewInvoiceScreen() {
     try {
       const selectedClient = clients.find(c => c.id === formData.client_id);
       const html = generateInvoiceHTML(formData, items, selectedClient);
-      
+
       const { uri } = await Print.printToFileAsync({
         html,
         base64: false,
+        width: 612, // Standard letter width in points
+        height: 792, // Standard letter height in points
       });
 
       if (Platform.OS === 'web') {
@@ -216,10 +218,23 @@ export default function NewInvoiceScreen() {
         const link = document.createElement('a');
         link.href = uri;
         link.download = `${formData.invoice_number}.pdf`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+
+        Alert.alert('Success', 'Invoice downloaded successfully!');
       } else {
         // For mobile, use sharing
-        await Sharing.shareAsync(uri);
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Download Invoice',
+            UTI: 'com.adobe.pdf',
+          });
+        } else {
+          Alert.alert('Error', 'Sharing is not available on this device');
+        }
       }
     } catch (error) {
       console.error('Error downloading invoice:', error);
@@ -416,7 +431,7 @@ export default function NewInvoiceScreen() {
     }
 
     setLoading(true);
-    
+
     try {
       const subtotal = calculateSubtotal();
       const tax = calculateTax();
@@ -442,7 +457,7 @@ export default function NewInvoiceScreen() {
         }])
         .select()
         .single();
-      
+
       if (invoiceError) throw invoiceError;
 
       // Add invoice items
@@ -776,12 +791,7 @@ export default function NewInvoiceScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    totalRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
+
     totalLabel: {
       fontSize: 14,
       fontFamily: 'Inter-Medium',
@@ -852,7 +862,7 @@ export default function NewInvoiceScreen() {
     // Preview Modal Styles
     previewModal: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: '#f5f5f5',
     },
     previewHeader: {
       flexDirection: 'row',
@@ -869,35 +879,184 @@ export default function NewInvoiceScreen() {
       fontFamily: 'Inter-Bold',
       color: colors.text,
     },
+    previewHeaderActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
     previewContent: {
       flex: 1,
+    },
+    previewScrollContent: {
       padding: 24,
     },
-    previewInvoice: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 24,
-      borderWidth: 1,
-      borderColor: colors.border,
+    invoiceDocument: {
+      backgroundColor: 'white',
+      borderRadius: 8,
+      padding: 40,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
     },
-    previewInvoiceHeader: {
+    invoiceHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingBottom: 40,
+      borderBottomWidth: 1,
+      borderBottomColor: '#e5e5e5',
+      marginBottom: 40,
+    },
+    invoiceHeaderLeft: {
+      flex: 1,
+    },
+    invoiceTitle: {
+      fontSize: 32,
+      fontFamily: 'Inter-Bold',
+      color: '#333',
+      letterSpacing: 2,
+    },
+    invoiceHeaderRight: {
+      alignItems: 'flex-end',
+    },
+    contactInfo: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#666',
+      marginBottom: 2,
+    },
+    invoiceDetailsSection: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 40,
+    },
+    invoiceDetailsLeft: {
+      flex: 1,
+    },
+    invoiceDetailsRight: {
+      alignItems: 'flex-end',
+      minWidth: 180,
+    },
+    sectionLabel: {
+      fontSize: 14,
+      fontFamily: 'Inter-Medium',
+      color: '#666',
+      marginBottom: 8,
+    },
+    clientName: {
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      color: '#333',
+      marginBottom: 4,
+    },
+    clientDetails: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#666',
+      marginBottom: 2,
+    },
+    invoiceMetaRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 24,
-      paddingBottom: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      marginBottom: 8,
+      minWidth: 180,
     },
-    previewInvoiceTitle: {
-      fontSize: 32,
-      fontFamily: 'Inter-Bold',
-      color: colors.primary,
-    },
-    previewInvoiceNumber: {
-      fontSize: 16,
+    metaLabel: {
+      fontSize: 14,
       fontFamily: 'Inter-Medium',
-      color: colors.textSecondary,
+      color: '#666',
+    },
+    metaValue: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+      color: '#333',
+    },
+    invoiceTotalAmount: {
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      color: '#2563eb',
+    },
+    itemsTable: {
+      marginBottom: 32,
+    },
+    tableHeader: {
+      flexDirection: 'row',
+      paddingVertical: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: '#e5e5e5',
+      marginBottom: 16,
+    },
+    tableHeaderCell: {
+      fontSize: 14,
+      fontFamily: 'Inter-Bold',
+      color: '#666',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    descriptionColumn: {
+      flex: 2,
+    },
+    unitCostColumn: {
+      flex: 1,
+    },
+    qtyColumn: {
+      flex: 1,
+    },
+    amountColumn: {
+      flex: 1,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+      alignItems: 'flex-start',
+    },
+    tableCell: {
+      flex: 1,
+    },
+    tableCellText: {
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+      color: '#333',
+    },
+    itemDescription: {
+      fontSize: 14,
+      fontFamily: 'Inter-SemiBold',
+      color: '#333',
+      marginBottom: 2,
+    },
+    itemSubDescription: {
+      fontSize: 12,
+      fontFamily: 'Inter-Regular',
+      color: '#999',
+      fontStyle: 'italic',
+    },
+    totalsSection: {
+      alignItems: 'flex-end',
+      borderTopWidth: 2,
+      borderTopColor: '#e5e5e5',
+      paddingTop: 16,
+    },
+    totalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+      minWidth: 200,
+    },
+    totalRowLabel: {
+      fontSize: 16,
+      fontFamily: 'Inter-SemiBold',
+      color: '#333',
+    },
+    totalRowValue: {
+      fontSize: 16,
+      fontFamily: 'Inter-Bold',
+      color: '#333',
     },
   });
 
@@ -910,7 +1069,7 @@ export default function NewInvoiceScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>New Invoice</Text>
         </View>
-        
+
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.headerButton, styles.headerButtonSecondary]}
@@ -924,8 +1083,8 @@ export default function NewInvoiceScreen() {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={Platform.OS === 'web'}
       >
@@ -958,7 +1117,7 @@ export default function NewInvoiceScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Invoice Details</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Invoice Number</Text>
             <View style={styles.inputWithIcon}>
@@ -990,9 +1149,9 @@ export default function NewInvoiceScreen() {
                 </Text>
                 <ChevronDown size={20} color={colors.textMuted} />
               </TouchableOpacity>
-              
+
               {showClientDropdown && (
-                <ScrollView 
+                <ScrollView
                   style={styles.dropdownList}
                   showsVerticalScrollIndicator={Platform.OS === 'web'}
                 >
@@ -1028,9 +1187,9 @@ export default function NewInvoiceScreen() {
                 </Text>
                 <ChevronDown size={20} color={colors.textMuted} />
               </TouchableOpacity>
-              
+
               {showProjectDropdown && (
-                <ScrollView 
+                <ScrollView
                   style={styles.dropdownList}
                   showsVerticalScrollIndicator={Platform.OS === 'web'}
                 >
@@ -1165,7 +1324,7 @@ export default function NewInvoiceScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Additional Information</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Notes</Text>
             <TextInput
@@ -1196,7 +1355,7 @@ export default function NewInvoiceScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, styles.secondaryActionButton]}
           onPress={handlePreview}
         >
@@ -1205,8 +1364,8 @@ export default function NewInvoiceScreen() {
             Preview
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.actionButton, styles.secondaryActionButton]}
           onPress={handleDownload}
         >
@@ -1215,7 +1374,7 @@ export default function NewInvoiceScreen() {
             Download
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.actionButton, styles.primaryActionButton]}
           onPress={handleSave}
@@ -1237,48 +1396,122 @@ export default function NewInvoiceScreen() {
         <View style={styles.previewModal}>
           <View style={styles.previewHeader}>
             <Text style={styles.previewTitle}>Invoice Preview</Text>
-            <TouchableOpacity onPress={() => setShowPreview(false)}>
-              <X size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={styles.previewHeaderActions}>
+              <TouchableOpacity
+                style={[styles.headerButton, styles.headerButtonSecondary]}
+                onPress={handleDownload}
+              >
+                <Download size={16} color={colors.primary} />
+                <Text style={[styles.headerButtonText, styles.headerButtonTextSecondary]}>
+                  Download
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowPreview(false)}>
+                <X size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
-          <ScrollView 
+
+          <ScrollView
             style={styles.previewContent}
+            contentContainerStyle={styles.previewScrollContent}
             showsVerticalScrollIndicator={Platform.OS === 'web'}
           >
-            <View style={styles.previewInvoice}>
-              <View style={styles.previewInvoiceHeader}>
-                <View>
-                  <Text style={styles.previewInvoiceTitle}>Invoice</Text>
-                  <Text style={styles.previewInvoiceNumber}>#{formData.invoice_number}</Text>
+            <View style={styles.invoiceDocument}>
+              {/* Invoice Header */}
+              <View style={styles.invoiceHeader}>
+                <View style={styles.invoiceHeaderLeft}>
+                  <Text style={styles.invoiceTitle}>INVOICE</Text>
                 </View>
-                <View>
-                  <Text style={[styles.totalFinalValue, { fontSize: 24 }]}>
-                    ${calculateTotal().toFixed(2)}
-                  </Text>
+                <View style={styles.invoiceHeaderRight}>
+                  <Text style={styles.contactInfo}>647-444-1234</Text>
+                  <Text style={styles.contactInfo}>your@email.com</Text>
+                  <Text style={styles.contactInfo}>yourwebsite.com</Text>
                 </View>
-              </View>
-              
-              <View style={{ marginBottom: 20 }}>
-                <Text style={[styles.label, { marginBottom: 8 }]}>Bill To:</Text>
-                <Text style={[styles.totalFinalLabel, { fontSize: 16 }]}>
-                  {selectedClient?.name || 'Client Name'}
-                </Text>
-                <Text style={styles.totalLabel}>{selectedClient?.company || 'Company'}</Text>
               </View>
 
-              <View style={{ marginBottom: 20 }}>
-                <Text style={[styles.label, { marginBottom: 8 }]}>Items:</Text>
+              {/* Invoice Details Section */}
+              <View style={styles.invoiceDetailsSection}>
+                <View style={styles.invoiceDetailsLeft}>
+                  <Text style={styles.sectionLabel}>Billed To</Text>
+                  <Text style={styles.clientName}>{selectedClient?.name || 'Client Name'}</Text>
+                  <Text style={styles.clientDetails}>{selectedClient?.address || '1 Client Address'}</Text>
+                  <Text style={styles.clientDetails}>
+                    {selectedClient?.address ? 'City, State, Country' : 'City, State, Country'}
+                  </Text>
+                  <Text style={styles.clientDetails}>ZIP CODE</Text>
+                </View>
+
+                <View style={styles.invoiceDetailsRight}>
+                  <View style={styles.invoiceMetaRow}>
+                    <Text style={styles.metaLabel}>Invoice Number</Text>
+                    <Text style={styles.metaValue}>{formData.invoice_number}</Text>
+                  </View>
+                  <View style={styles.invoiceMetaRow}>
+                    <Text style={styles.metaLabel}>Invoice Total</Text>
+                    <Text style={styles.invoiceTotalAmount}>
+                      ${calculateTotal().toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={styles.invoiceMetaRow}>
+                    <Text style={styles.metaLabel}>Date Of Issue</Text>
+                    <Text style={styles.metaValue}>
+                      {formData.issue_date.toLocaleDateString('en-US', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        year: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Items Table */}
+              <View style={styles.itemsTable}>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderCell, styles.descriptionColumn]}>Description</Text>
+                  <Text style={[styles.tableHeaderCell, styles.unitCostColumn]}>Unit Cost</Text>
+                  <Text style={[styles.tableHeaderCell, styles.qtyColumn]}>Qty / Hr Rate</Text>
+                  <Text style={[styles.tableHeaderCell, styles.amountColumn]}>Amount</Text>
+                </View>
+
+                {/* Table Rows */}
                 {items.map((item, index) => (
-                  <View key={index} style={[styles.totalRow, { marginBottom: 4 }]}>
-                    <Text style={styles.totalLabel}>{item.description}</Text>
-                    <Text style={styles.totalValue}>${item.amount.toFixed(2)}</Text>
+                  <View key={index} style={styles.tableRow}>
+                    <View style={[styles.tableCell, styles.descriptionColumn]}>
+                      <Text style={styles.itemDescription}>{item.description}</Text>
+                      <Text style={styles.itemSubDescription}>Item description goes here</Text>
+                    </View>
+                    <View style={styles.unitCostColumn}>
+                      <Text style={[styles.tableCellText, { textAlign: 'center' }]}>
+                        ${item.rate.toFixed(0)}
+                      </Text>
+                    </View>
+                    <View style={styles.qtyColumn}>
+                      <Text style={[styles.tableCellText, { textAlign: 'center' }]}>
+                        {item.quantity}
+                      </Text>
+                    </View>
+                    <View style={styles.amountColumn}>
+                      <Text style={[styles.tableCellText, { textAlign: 'right' }]}>
+                        {item.amount.toFixed(0)}
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
 
-              <View style={[styles.totalRow, styles.totalFinal]}>
-                <Text style={styles.totalFinalLabel}>Total</Text>
-                <Text style={styles.totalFinalValue}>${calculateTotal().toFixed(2)}</Text>
+              {/* Totals Section */}
+              <View style={styles.totalsSection}>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalRowLabel}>Subtotal</Text>
+                  <Text style={styles.totalRowValue}>${calculateSubtotal().toFixed(2)}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalRowLabel}>Tax</Text>
+                  <Text style={styles.totalRowValue}>${calculateTax().toFixed(2)}</Text>
+                </View>
               </View>
             </View>
           </ScrollView>
